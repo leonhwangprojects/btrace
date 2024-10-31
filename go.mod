@@ -8,6 +8,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/knightsc/gapstone v4.0.1+incompatible
 	github.com/spf13/pflag v1.0.5
+	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
 )
 
 require (
