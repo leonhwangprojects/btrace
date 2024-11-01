@@ -65,8 +65,8 @@ make
 ```bash
 # ./bpflbr -h
 Usage of bpflbr:
-      --dump-jited     dump native insn info of bpf prog, the one prog ID must be provided by --prog (its function name will be ignored)
-  -p, --prog strings   bpf prog info for bpflbr in format PROG[,PROG,..], PROG: <prog ID>[:<prog function name>]; all bpf progs will be traced by default
+      --dump-jited     dump native insn info of bpf prog, the one bpf prog must be provided by --prog (its function name will be ignored)
+  -p, --prog strings   bpf prog info for bpflbr in format PROG[,PROG,..], PROG: PROGID[:<prog function name>], PROGID: <prog ID> or 'i/id:<prog ID>' or 'p/pinned:<pinned file>' or 't/tag:<prog tag>' or 'n/name:<prog full name>'; all bpf progs will be traced by default
 ```
 
 ## Feature: dump jited insns of bpf prog

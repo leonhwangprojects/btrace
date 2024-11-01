@@ -4,6 +4,7 @@
 package bpflbr
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -12,26 +13,81 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
+const (
+	progFlagDescriptorID     = "id"
+	progFlagDescriptorPinned = "pinned"
+	progFlagDescriptorTag    = "tag"
+	progFlagDescriptorName   = "name"
+)
+
 type ProgFlag struct {
-	progID   uint32
-	funcName string
+	progID uint32
+	pinned string
+	tag    string
+	name   string
+
+	descriptor string
+	funcName   string
+}
+
+func parseProgFlag(p string) (ProgFlag, error) {
+	var pf ProgFlag
+
+	id, funcName, ok := strings.Cut(p, ":")
+	switch id {
+	case "i", "id":
+		id, funcName, ok = strings.Cut(funcName, ":")
+		break
+
+	case "p", "pinned":
+		pf.descriptor = progFlagDescriptorPinned
+		pf.pinned, pf.funcName, _ = strings.Cut(funcName, ":")
+		if !fileExists(pf.pinned) {
+			return pf, fmt.Errorf("pinned file %s does not exist", pf.pinned)
+		}
+		return pf, nil
+
+	case "t", "tag":
+		pf.descriptor = progFlagDescriptorTag
+		pf.tag, pf.funcName, _ = strings.Cut(funcName, ":")
+		if pf.tag == "" {
+			return pf, errors.New("tag must not be empty")
+		}
+		return pf, nil
+
+	case "n", "name":
+		pf.descriptor = progFlagDescriptorName
+		pf.name, pf.funcName, _ = strings.Cut(funcName, ":")
+		if pf.name == "" {
+			return pf, errors.New("name must not be empty")
+		}
+		return pf, nil
+
+	default:
+	}
+
+	progID, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		return pf, fmt.Errorf("failed to parse progID %s from %s: %w", id, p, err)
+	}
+
+	pf.descriptor = progFlagDescriptorID
+	pf.progID = uint32(progID)
+	if ok {
+		pf.funcName = funcName
+	}
+
+	return pf, nil
 }
 
 func parseProgsFlag(progs []string) ([]ProgFlag, error) {
 	flags := make([]ProgFlag, 0, len(progs))
 	for _, p := range progs {
-		id, funcName, ok := strings.Cut(p, ":")
-
-		progID, err := strconv.ParseUint(id, 10, 32)
+		pf, err := parseProgFlag(p)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse progID %s from %s: %v", id, p, err)
+			return nil, err
 		}
 
-		var pf ProgFlag
-		pf.progID = uint32(progID)
-		if ok {
-			pf.funcName = funcName
-		}
 		flags = append(flags, pf)
 	}
 
@@ -48,8 +104,8 @@ func ParseFlags() (*Flags, error) {
 	var flags Flags
 
 	f := flag.NewFlagSet("bpflbr", flag.ExitOnError)
-	f.StringSliceVarP(&flags.progs, "prog", "p", nil, "bpf prog info for bpflbr in format PROG[,PROG,..], PROG: <prog ID>[:<prog function name>]; all bpf progs will be traced by default")
-	f.BoolVar(&flags.dumpProg, "dump-jited", false, "dump native insn info of bpf prog, the one prog ID must be provided by --prog (its function name will be ignored)")
+	f.StringSliceVarP(&flags.progs, "prog", "p", nil, "bpf prog info for bpflbr in format PROG[,PROG,..], PROG: PROGID[:<prog function name>], PROGID: <prog ID> or 'i/id:<prog ID>' or 'p/pinned:<pinned file>' or 't/tag:<prog tag>' or 'n/name:<prog full name>'; all bpf progs will be traced by default")
+	f.BoolVar(&flags.dumpProg, "dump-jited", false, "dump native insn info of bpf prog, the one bpf prog must be provided by --prog (its function name will be ignored)")
 
 	return &flags, f.Parse(os.Args)
 }
