@@ -9,6 +9,7 @@ require (
 	github.com/knightsc/gapstone v4.0.1+incompatible
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
+	golang.org/x/sync v0.8.0
 )
 
 require (
