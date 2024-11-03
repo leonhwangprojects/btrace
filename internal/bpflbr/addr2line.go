@@ -15,10 +15,12 @@ type Addr2Line struct {
 	vmlinux string
 	a2l     *addr2line.Addr2Line
 	cache   *lru.Cache[uintptr, *addr2line.Addr2LineEntry]
+
+	kaslrOffset uintptr
 }
 
 // NewAddr2Line creates a new Addr2Line instance from the given vmlinux file.
-func NewAddr2Line(vmlinux string) (*Addr2Line, error) {
+func NewAddr2Line(vmlinux string, kaslrOffset uint64) (*Addr2Line, error) {
 	a2l, err := addr2line.New(vmlinux)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create addr2line from %s: %w", vmlinux, err)
@@ -29,11 +31,14 @@ func NewAddr2Line(vmlinux string) (*Addr2Line, error) {
 		vmlinux: vmlinux,
 		a2l:     a2l,
 		cache:   cache,
+
+		kaslrOffset: uintptr(kaslrOffset),
 	}, nil
 }
 
 // Get returns the addr2line entry from the vmlinux file for the given address.
 func (a2l *Addr2Line) Get(addr uintptr) (*addr2line.Addr2LineEntry, error) {
+	addr += a2l.kaslrOffset
 	entry, ok := a2l.cache.Get(addr)
 	if ok {
 		return entry, nil
