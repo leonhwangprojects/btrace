@@ -23,6 +23,5 @@ func main() {
 func dumpProg(progs []bpflbr.ProgFlag) {
 	assert.SliceLen(progs, 1, "Only one prog ID is allowed for --dump-jited")
 
-	pf := progs[0]
-	bpflbr.DumpProg(pf)
+	bpflbr.DumpProg(progs)
 }
