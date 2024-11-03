@@ -5,6 +5,7 @@ package bpflbr
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -15,13 +16,23 @@ import (
 	"github.com/Asphaltt/bpflbr/internal/assert"
 )
 
-func DumpProg(pf ProgFlag) {
-	prog, err := ebpf.NewProgramFromID(ebpf.ProgramID(pf.progID))
-	assert.NoErr(err, "Failed to load prog %d: %v", pf.progID)
-	defer prog.Close()
+func DumpProg(pf []ProgFlag) {
+	progs, err := newBPFProgs(gapstone.Engine{}, pf, true)
+	assert.NoErr(err, "Failed to get bpf progs: %v")
+	defer progs.close()
+
+	var prog *ebpf.Program
+	for _, p := range progs.progs {
+		prog = p
+		break
+	}
+
+	if prog == nil {
+		log.Fatalf("No prog found")
+	}
 
 	info, err := prog.Info()
-	assert.NoErr(err, "Failed to get prog info: %v", err)
+	assert.NoErr(err, "Failed to get prog info: %v")
 
 	jitedInsns, _ := info.JitedInsns()
 	jitedKsyms, _ := info.KsymAddrs()
@@ -79,7 +90,7 @@ func DumpProg(pf ProgFlag) {
 			}
 
 			inst, err := engine.Disasm(fnInsns, kaddr, 1)
-			assert.NoErr(err, "Failed to disasm instruction: %v", err)
+			assert.NoErr(err, "Failed to disasm instruction: %v")
 
 			var opcodes []string
 			for _, insn := range inst[0].Bytes {
