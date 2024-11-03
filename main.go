@@ -4,9 +4,23 @@
 package main
 
 import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/ringbuf"
+	"github.com/knightsc/gapstone"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/Asphaltt/bpflbr/internal/assert"
 	"github.com/Asphaltt/bpflbr/internal/bpflbr"
 )
+
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang lbr ./bpf/lbr.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -Wall
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang feat ./bpf/feature.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -Wall
 
 func main() {
 	flags, err := bpflbr.ParseFlags()
@@ -16,12 +30,77 @@ func main() {
 	assert.NoErr(err, "Failed to parse bpf prog infos: %v")
 
 	if flags.DumpProg() {
-		dumpProg(progs)
+		assert.SliceLen(progs, 1, "Only one --prog is allowed for --dump-jited")
+		bpflbr.DumpProg(progs)
+		return
 	}
-}
 
-func dumpProg(progs []bpflbr.ProgFlag) {
-	assert.SliceLen(progs, 1, "Only one prog ID is allowed for --dump-jited")
+	featBPFSpec, err := loadFeat()
+	assert.NoErr(err, "Failed to load feat bpf spec: %v")
 
-	bpflbr.DumpProg(progs)
+	err = bpflbr.DetectBPFFeatures(featBPFSpec)
+	assert.NoErr(err, "Failed to detect bpf features: %v")
+
+	kallsyms, err := bpflbr.NewKallsyms()
+	assert.NoErr(err, "Failed to read /proc/kallsyms: %v")
+
+	vmlinux, err := bpflbr.FindVmlinux()
+	assert.NoErr(err, "Failed to find vmlinux: %v")
+
+	textAddr, err := bpflbr.ReadTextAddrFromVmlinux(vmlinux)
+	assert.NoErr(err, "Failed to read .text address from vmlinux: %v")
+
+	kaslrOffset := textAddr - kallsyms.Stext()
+	addr2line, err := bpflbr.NewAddr2Line(vmlinux, kaslrOffset, kallsyms.SysBPF())
+	assert.NoErr(err, "Failed to create addr2line: %v")
+
+	engine, err := gapstone.New(int(gapstone.CS_ARCH_X86), int(gapstone.CS_MODE_64))
+	assert.NoErr(err, "Failed to create capstone engine: %v")
+	defer engine.Close()
+
+	bpfProgs, err := bpflbr.NewBPFProgs(engine, progs, false)
+	assert.NoErr(err, "Failed to get bpf progs: %v")
+	defer bpfProgs.Close()
+
+	tracingTargets := bpfProgs.Tracings()
+	assert.SliceNotEmpty(tracingTargets, "No bpf progs found")
+
+	bpfSpec, err := loadLbr()
+	assert.NoErr(err, "Failed to load bpf spec: %v")
+
+	events, err := ebpf.NewMap(bpfSpec.Maps["events"])
+	assert.NoErr(err, "Failed to create events map: %v")
+	defer events.Close()
+
+	reusedMaps := map[string]*ebpf.Map{
+		"events": events,
+	}
+
+	tracings, err := bpflbr.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets)
+	assert.NoVerifierErr(err, "Failed to trace bpf progs: %v")
+	defer tracings.Close()
+
+	reader, err := ringbuf.NewReader(events)
+	assert.NoErr(err, "Failed to create ringbuf reader: %v")
+	defer reader.Close()
+
+	log.Print("bpflbr is running..")
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	errg, ctx := errgroup.WithContext(ctx)
+
+	errg.Go(func() error {
+		<-ctx.Done()
+		_ = reader.Close()
+		return nil
+	})
+
+	errg.Go(func() error {
+		return bpflbr.Run(reader, bpfProgs, addr2line, kallsyms)
+	})
+
+	err = errg.Wait()
+	assert.NoErr(err, "Failed: %v")
 }
