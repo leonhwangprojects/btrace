@@ -112,8 +112,8 @@ func (ks *Kallsyms) SysBPF() uint64 {
 	return ks.sysBPF
 }
 
-// Find returns the symbol entry of the given address.
-func (ks *Kallsyms) Find(kaddr uintptr) (*KsymEntry, bool) {
+// find returns the symbol entry of the given address.
+func (ks *Kallsyms) find(kaddr uintptr) (*KsymEntry, bool) {
 	addr := uint64(kaddr)
 	if addr < ks.addrs[0] || addr > ks.addrs[len(ks.addrs)-1] {
 		return nil, false

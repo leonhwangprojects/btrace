@@ -81,6 +81,10 @@ func newBPFProgInfo(prog *ebpf.Program, engine gapstone.Engine) (*bpfProgInfo, e
 		return nil, fmt.Errorf("func info number %d != jited func lens number %d", len(funcInfos), len(jitedFuncLens))
 	}
 
+	if len(jitedKsyms) != len(jitedFuncLens) {
+		return nil, fmt.Errorf("jited ksyms number %d != jited func lens number %d", len(jitedKsyms), len(jitedFuncLens))
+	}
+
 	if len(jitedLineInfos) != len(lines) {
 		return nil, fmt.Errorf("line info number %d != jited line info number %d", len(lines), len(jitedLineInfos))
 	}

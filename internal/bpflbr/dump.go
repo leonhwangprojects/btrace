@@ -17,9 +17,9 @@ import (
 )
 
 func DumpProg(pf []ProgFlag) {
-	progs, err := newBPFProgs(gapstone.Engine{}, pf, true)
+	progs, err := NewBPFProgs(gapstone.Engine{}, pf, true)
 	assert.NoErr(err, "Failed to get bpf progs: %v")
-	defer progs.close()
+	defer progs.Close()
 
 	var prog *ebpf.Program
 	for _, p := range progs.progs {

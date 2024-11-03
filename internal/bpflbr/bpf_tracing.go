@@ -23,7 +23,7 @@ type bpfTracing struct {
 	links []link.Link
 }
 
-func newBPFTracing(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, infos []bpfTracingInfo) error {
+func NewBPFTracing(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, infos []bpfTracingInfo) (*bpfTracing, error) {
 	var t bpfTracing
 	t.links = make([]link.Link, 0, len(infos))
 
@@ -37,14 +37,14 @@ func newBPFTracing(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, i
 	}
 
 	if err := errg.Wait(); err != nil {
-		t.close()
-		return fmt.Errorf("failed to trace bpf progs: %w", err)
+		t.Close()
+		return nil, fmt.Errorf("failed to trace bpf progs: %w", err)
 	}
 
-	return nil
+	return &t, nil
 }
 
-func (t *bpfTracing) close() {
+func (t *bpfTracing) Close() {
 	t.llock.Lock()
 	defer t.llock.Unlock()
 
