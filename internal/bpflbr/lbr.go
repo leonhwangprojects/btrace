@@ -6,6 +6,7 @@ package bpflbr
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"unsafe"
 
@@ -13,7 +14,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *Kallsyms) error {
+func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *Kallsyms, w io.Writer) error {
 	type LbrEntry struct {
 		From  uintptr
 		To    uintptr
@@ -85,7 +86,7 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 
 		fmt.Fprintf(&sb, "Recv a record for %s with retval=%d :\n", progName, event.Retval)
 		stack.output(&sb)
-		fmt.Println(sb.String())
+		fmt.Fprintln(w, sb.String())
 
 		sb.Reset()
 		stack.reset()

@@ -84,6 +84,14 @@ func main() {
 	assert.NoErr(err, "Failed to create ringbuf reader: %v")
 	defer reader.Close()
 
+	w := os.Stdout
+	if flags.OutputFile() != "" {
+		f, err := os.OpenFile(flags.OutputFile(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+		assert.NoErr(err, "Failed to create output file: %v")
+		defer f.Close()
+		w = f
+	}
+
 	log.Print("bpflbr is running..")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -98,7 +106,7 @@ func main() {
 	})
 
 	errg.Go(func() error {
-		return bpflbr.Run(reader, bpfProgs, addr2line, kallsyms)
+		return bpflbr.Run(reader, bpfProgs, addr2line, kallsyms, w)
 	})
 
 	err = errg.Wait()
