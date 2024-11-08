@@ -44,16 +44,46 @@ func NewBPFProgs(engine gapstone.Engine, pflags []ProgFlag, onlyPrepare bool) (*
 	}
 
 	for id, prog := range progs.progs {
-		progs.infos[id], err = newBPFProgInfo(prog, engine)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create BPF program info for ID(%d): %w", id, err)
+		if err := progs.addProg(prog, id, engine); err != nil {
+			return nil, err
 		}
-
-		info := progs.infos[id].progs[0]
-		progs.ksyms[info.kaddrRange.start] = info.funcName
 	}
 
 	return &progs, nil
+}
+
+func (b *bpfProgs) addProg(prog *ebpf.Program, id ebpf.ProgramID, engine gapstone.Engine) error {
+	var err error
+	b.infos[id], err = newBPFProgInfo(prog, engine)
+	if err != nil {
+		return fmt.Errorf("failed to create BPF program info for ID(%d): %w", id, err)
+	}
+
+	info := b.infos[id].progs[0]
+	b.ksyms[info.kaddrRange.start] = info.funcName
+
+	return nil
+}
+
+func (b *bpfProgs) AddProgs(progs []*ebpf.Program, engine gapstone.Engine) error {
+	for _, prog := range progs {
+		info, err := prog.Info()
+		if err != nil {
+			return fmt.Errorf("failed to get prog info: %w", err)
+		}
+
+		id, ok := info.ID()
+		if !ok {
+			return fmt.Errorf("failed to get prog ID")
+		}
+
+		err = b.addProg(prog, id, engine)
+		if err != nil {
+			return fmt.Errorf("failed to add BPF program: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (b *bpfProgs) Close() {
