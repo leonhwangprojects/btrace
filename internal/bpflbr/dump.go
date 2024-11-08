@@ -84,8 +84,9 @@ func DumpProg(pf []ProgFlag) {
 		for len(fnInsns) > 0 {
 			kaddr := ksym + pc
 			if li, ok := jited2LineInfos[kaddr]; ok {
+				fileName := strings.TrimLeft(li.Line.FileName(), "./")
 				fmt.Fprintf(&sb, "; %s:%d:%d %s\n",
-					li.Line.FileName(), li.Line.LineNumber(), li.Line.LineColumn(),
+					fileName, li.Line.LineNumber(), li.Line.LineColumn(),
 					strings.TrimSpace(li.Line.Line()))
 			}
 
