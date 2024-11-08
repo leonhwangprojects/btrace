@@ -80,6 +80,9 @@ func main() {
 	assert.NoVerifierErr(err, "Failed to trace bpf progs: %v")
 	defer tracings.Close()
 
+	err = bpfProgs.AddProgs(tracings.Progs(), engine)
+	assert.NoErr(err, "Failed to add bpf progs: %v")
+
 	reader, err := ringbuf.NewReader(events)
 	assert.NoErr(err, "Failed to create ringbuf reader: %v")
 	defer reader.Close()

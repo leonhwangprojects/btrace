@@ -20,7 +20,12 @@ const (
 
 type bpfTracing struct {
 	llock sync.Mutex
+	progs []*ebpf.Program
 	links []link.Link
+}
+
+func (t *bpfTracing) Progs() []*ebpf.Program {
+	return t.progs
 }
 
 func NewBPFTracing(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, infos []bpfTracingInfo) (*bpfTracing, error) {
@@ -77,15 +82,22 @@ func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]
 	defer coll.Close()
 
 	prog := coll.Programs[tracingFuncName]
+	cloned, err := prog.Clone()
+	if err != nil {
+		return fmt.Errorf("failed to clone bpf program: %w", err)
+	}
+
 	l, err := link.AttachTracing(link.TracingOptions{
-		Program:    prog,
+		Program:    cloned,
 		AttachType: ebpf.AttachTraceFExit,
 	})
 	if err != nil {
+		_ = cloned.Close()
 		return fmt.Errorf("failed to attach tracing: %w", err)
 	}
 
 	t.llock.Lock()
+	t.progs = append(t.progs, cloned)
 	t.links = append(t.links, l)
 	t.llock.Unlock()
 
