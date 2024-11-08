@@ -46,7 +46,7 @@ func (b *bpfProgAddrLineInfo) get(addr uintptr) (*bpfProgLineInfo, bool) {
 	var line bpfProgLineInfo
 	line.funcName = b.funcName
 	line.ksymAddr = b.kaddrRange.start
-	line.fileName = b.lineInfos[idx].Line.FileName()
+	line.fileName = strings.TrimLeft(b.lineInfos[idx].Line.FileName(), "./")
 	line.fileLine = b.lineInfos[idx].Line.LineNumber()
 	return &line, true
 }
