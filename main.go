@@ -83,6 +83,9 @@ func main() {
 	err = bpfProgs.AddProgs(tracings.Progs(), engine)
 	assert.NoErr(err, "Failed to add bpf progs: %v")
 
+	kallsyms, err = bpflbr.NewKallsyms()
+	assert.NoErr(err, "Failed to reread /proc/kallsyms: %v")
+
 	reader, err := ringbuf.NewReader(events)
 	assert.NoErr(err, "Failed to create ringbuf reader: %v")
 	defer reader.Close()
