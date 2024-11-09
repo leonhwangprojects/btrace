@@ -13,9 +13,7 @@ import (
 
 type bpfProgs struct {
 	progs map[ebpf.ProgramID]*ebpf.Program
-	infos map[ebpf.ProgramID]*bpfProgInfo
-
-	ksyms map[uintptr]string
+	funcs map[uintptr]*bpfProgInfo // func IP -> prog info
 
 	tracings map[string]bpfTracingInfo // id:func -> prog, func
 }
@@ -23,9 +21,8 @@ type bpfProgs struct {
 func NewBPFProgs(engine gapstone.Engine, pflags []ProgFlag, onlyPrepare bool) (*bpfProgs, error) {
 	var progs bpfProgs
 	progs.progs = make(map[ebpf.ProgramID]*ebpf.Program, len(pflags))
-	progs.infos = make(map[ebpf.ProgramID]*bpfProgInfo, len(pflags))
+	progs.funcs = make(map[uintptr]*bpfProgInfo, len(pflags))
 	progs.tracings = make(map[string]bpfTracingInfo, len(pflags))
-	progs.ksyms = make(map[uintptr]string)
 
 	var err error
 	defer func() {
@@ -53,15 +50,12 @@ func NewBPFProgs(engine gapstone.Engine, pflags []ProgFlag, onlyPrepare bool) (*
 }
 
 func (b *bpfProgs) addProg(prog *ebpf.Program, id ebpf.ProgramID, engine gapstone.Engine) error {
-	var err error
-	b.infos[id], err = newBPFProgInfo(prog, engine)
+	progInfo, err := newBPFProgInfo(prog, engine)
 	if err != nil {
 		return fmt.Errorf("failed to create BPF program info for ID(%d): %w", id, err)
 	}
 
-	info := b.infos[id].progs[0]
-	b.ksyms[info.kaddrRange.start] = info.funcName
-
+	b.funcs[progInfo.progs[0].kaddrRange.start] = progInfo
 	return nil
 }
 
@@ -97,7 +91,7 @@ func (b *bpfProgs) Tracings() []bpfTracingInfo {
 }
 
 func (b *bpfProgs) get(addr uintptr) (*bpfProgLineInfo, bool) {
-	for _, info := range b.infos {
+	for _, info := range b.funcs {
 		if line, ok := info.get(addr); ok {
 			return line, true
 		}

@@ -142,3 +142,17 @@ func (b *bpfProgInfo) get(addr uintptr) (*bpfProgLineInfo, bool) {
 
 	return nil, false
 }
+
+func (b *bpfProgInfo) contains(addr uintptr) bool {
+	for _, prog := range b.progs {
+		if addr >= prog.kaddrRange.start && addr < prog.kaddrRange.end {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (b *bpfProgInfo) funcName() string {
+	return b.progs[0].funcName
+}

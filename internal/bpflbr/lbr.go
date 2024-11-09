@@ -56,6 +56,12 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			continue
 		}
 
+		progInfo, ok := progs.funcs[event.FuncIP]
+		if !ok {
+			continue
+		}
+
+		foundEntries := false
 		nrEntries := event.NrBytes / int64(8*3)
 		lbrEntries := make([]branchEntry, 0, nrEntries)
 		for i := 0; i < int(nrEntries); i++ {
@@ -64,9 +70,14 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 				break
 			}
 
-			from := getLineInfo(entry.From, progs, addr2line, ksyms)
-			to := getLineInfo(entry.To, progs, addr2line, ksyms)
-			lbrEntries = append(lbrEntries, branchEntry{from, to})
+			if foundEntries {
+				from := getLineInfo(entry.From, progs, addr2line, ksyms)
+				to := getLineInfo(entry.To, progs, addr2line, ksyms)
+				lbrEntries = append(lbrEntries, branchEntry{from, to})
+			} else {
+				foundEntries = progInfo.contains(entry.From) || progInfo.contains(entry.To)
+				// Skip BPF/kprobe/perf internal entries.
+			}
 		}
 
 		if len(lbrEntries) == 0 {
@@ -79,11 +90,7 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			stack.pushEntry(lbrEntries[i])
 		}
 
-		progName := progs.ksyms[event.FuncIP]
-		if progName == "" {
-			progName = fmt.Sprintf("UNKNOWN@%#x", event.FuncIP)
-		}
-
+		progName := progInfo.funcName()
 		fmt.Fprintf(&sb, "Recv a record for %s with retval=%d :\n", progName, event.Retval)
 		stack.output(&sb)
 		fmt.Fprintln(w, sb.String())
