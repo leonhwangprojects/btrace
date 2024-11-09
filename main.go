@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 	"os/signal"
@@ -14,6 +15,7 @@ import (
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/knightsc/gapstone"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sys/unix"
 
 	"github.com/Asphaltt/bpflbr/internal/assert"
 	"github.com/Asphaltt/bpflbr/internal/bpflbr"
@@ -40,6 +42,13 @@ func main() {
 
 	err = bpflbr.DetectBPFFeatures(featBPFSpec)
 	assert.NoErr(err, "Failed to detect bpf features: %v")
+
+	lbrPerfEvents, err := bpflbr.OpenLbrPerfEvent()
+	if err != nil && errors.Is(err, unix.ENOENT) {
+		log.Fatalln("LBR is not supported on current system")
+	}
+	assert.NoErr(err, "Failed to open LBR perf event: %v")
+	defer lbrPerfEvents.Close()
 
 	kallsyms, err := bpflbr.NewKallsyms()
 	assert.NoErr(err, "Failed to read /proc/kallsyms: %v")
