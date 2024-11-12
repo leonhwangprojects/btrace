@@ -14,19 +14,19 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *Kallsyms, w io.Writer) error {
-	type LbrEntry struct {
-		From  uintptr
-		To    uintptr
-		Flags uint64
-	}
-	type Event struct {
-		Entries [32]LbrEntry
-		NrBytes int64
-		Retval  int64
-		FuncIP  uintptr
-	}
+type LbrEntry struct {
+	From  uintptr
+	To    uintptr
+	Flags uint64
+}
+type Event struct {
+	Entries [32]LbrEntry
+	NrBytes int64
+	Retval  int64
+	FuncIP  uintptr
+}
 
+func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *Kallsyms, w io.Writer) error {
 	stack := newLBRStack()
 
 	var sb strings.Builder

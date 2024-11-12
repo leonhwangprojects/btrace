@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"unsafe"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/ringbuf"
@@ -77,12 +78,22 @@ func main() {
 	bpfSpec, err := loadLbr()
 	assert.NoErr(err, "Failed to load bpf spec: %v")
 
+	numCPU, err := ebpf.PossibleCPU()
+	assert.NoErr(err, "Failed to get possible cpu: %v")
+
+	lbrsMapSpec := bpfSpec.Maps[".data.lbrs"]
+	lbrsMapSpec.ValueSize = uint32(unsafe.Sizeof(bpflbr.Event{})) * uint32(numCPU)
+	lbrsMapSpec.Contents[0].Value = make([]byte, lbrsMapSpec.ValueSize)
+	lbrs, err := ebpf.NewMap(lbrsMapSpec)
+	assert.NoErr(err, "Failed to create lbrs map: %v")
+
 	events, err := ebpf.NewMap(bpfSpec.Maps["events"])
 	assert.NoErr(err, "Failed to create events map: %v")
 	defer events.Close()
 
 	reusedMaps := map[string]*ebpf.Map{
-		"events": events,
+		"events":     events,
+		".data.lbrs": lbrs,
 	}
 
 	tracings, err := bpflbr.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets)
