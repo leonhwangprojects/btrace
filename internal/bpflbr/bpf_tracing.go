@@ -5,6 +5,7 @@ package bpflbr
 
 import (
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/cilium/ebpf"
@@ -94,6 +95,10 @@ func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]
 	if err != nil {
 		_ = cloned.Close()
 		return fmt.Errorf("failed to attach tracing: %w", err)
+	}
+
+	if verbose {
+		log.Printf("Tracing %s of prog %v", info.funcName, info.prog)
 	}
 
 	t.llock.Lock()

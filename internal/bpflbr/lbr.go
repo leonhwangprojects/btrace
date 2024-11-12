@@ -61,7 +61,7 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			continue
 		}
 
-		foundEntries := false
+		foundEntries := verbose
 		nrEntries := event.NrBytes / int64(8*3)
 		lbrEntries := make([]branchEntry, 0, nrEntries)
 		for i := 0; i < int(nrEntries); i++ {
