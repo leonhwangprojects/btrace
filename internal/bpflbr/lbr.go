@@ -61,27 +61,33 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			continue
 		}
 
-		foundEntries := verbose
 		nrEntries := event.NrBytes / int64(8*3)
-		lbrEntries := make([]branchEntry, 0, nrEntries)
-		for i := 0; i < int(nrEntries); i++ {
-			entry := event.Entries[i]
-			if entry == (LbrEntry{}) {
-				break
+		entries := event.Entries[:nrEntries]
+		if !verbose {
+			for i := range entries {
+				if progInfo.contains(entries[i].From) || progInfo.contains(entries[i].To) {
+					entries = entries[i:]
+					break
+				}
 			}
 
-			if foundEntries {
-				from := getLineInfo(entry.From, progs, addr2line, ksyms)
-				to := getLineInfo(entry.To, progs, addr2line, ksyms)
-				lbrEntries = append(lbrEntries, branchEntry{from, to})
-			} else {
-				foundEntries = progInfo.contains(entry.From) || progInfo.contains(entry.To)
-				// Skip BPF/kprobe/perf internal entries.
+			for i := len(entries) - 1; i >= 0; i-- {
+				if progInfo.contains(entries[i].From) || progInfo.contains(entries[i].To) {
+					entries = entries[:i+1]
+					break
+				}
+			}
+
+			if len(entries) == 0 {
+				continue
 			}
 		}
 
-		if len(lbrEntries) == 0 {
-			continue
+		lbrEntries := make([]branchEntry, 0, len(entries))
+		for _, entry := range entries {
+			from := getLineInfo(entry.From, progs, addr2line, ksyms)
+			to := getLineInfo(entry.To, progs, addr2line, ksyms)
+			lbrEntries = append(lbrEntries, branchEntry{from, to})
 		}
 
 		last := len(lbrEntries) - 1
