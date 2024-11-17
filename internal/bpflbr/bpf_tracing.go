@@ -23,13 +23,14 @@ type bpfTracing struct {
 	llock sync.Mutex
 	progs []*ebpf.Program
 	links []link.Link
+	klnks []link.Link
 }
 
 func (t *bpfTracing) Progs() []*ebpf.Program {
 	return t.progs
 }
 
-func NewBPFTracing(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, infos []bpfTracingInfo) (*bpfTracing, error) {
+func NewBPFTracing(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, infos []bpfTracingInfo, kfuncs []string) (*bpfTracing, error) {
 	var t bpfTracing
 	t.links = make([]link.Link, 0, len(infos))
 
@@ -39,6 +40,13 @@ func NewBPFTracing(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, i
 		info := info
 		errg.Go(func() error {
 			return t.traceProg(spec, reusedMaps, info)
+		})
+	}
+
+	for _, fn := range kfuncs {
+		fn := fn
+		errg.Go(func() error {
+			return t.traceFunc(spec, reusedMaps, fn)
 		})
 	}
 
@@ -63,6 +71,13 @@ func (t *bpfTracing) Close() {
 		})
 	}
 
+	errg.Go(func() error {
+		for _, l := range t.klnks {
+			_ = l.Close()
+		}
+		return nil
+	})
+
 	_ = errg.Wait()
 }
 
@@ -83,17 +98,14 @@ func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]
 	defer coll.Close()
 
 	prog := coll.Programs[tracingFuncName]
-	cloned, err := prog.Clone()
-	if err != nil {
-		return fmt.Errorf("failed to clone bpf program: %w", err)
-	}
+	delete(coll.Programs, tracingFuncName)
 
 	l, err := link.AttachTracing(link.TracingOptions{
-		Program:    cloned,
+		Program:    prog,
 		AttachType: ebpf.AttachTraceFExit,
 	})
 	if err != nil {
-		_ = cloned.Close()
+		_ = prog.Close()
 		return fmt.Errorf("failed to attach tracing: %w", err)
 	}
 
@@ -102,8 +114,46 @@ func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]
 	}
 
 	t.llock.Lock()
-	t.progs = append(t.progs, cloned)
+	t.progs = append(t.progs, prog)
 	t.links = append(t.links, l)
+	t.llock.Unlock()
+
+	return nil
+}
+
+func (t *bpfTracing) traceFunc(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, fn string) error {
+	spec = spec.Copy()
+
+	progSpec := spec.Programs[tracingFuncName]
+	progSpec.AttachTo = fn
+	progSpec.AttachType = ebpf.AttachTraceFExit
+
+	coll, err := ebpf.NewCollectionWithOptions(spec, ebpf.CollectionOptions{
+		MapReplacements: reusedMaps,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create bpf collection for tracing: %w", err)
+	}
+	defer coll.Close()
+
+	prog := coll.Programs[tracingFuncName]
+	delete(coll.Programs, tracingFuncName)
+	l, err := link.AttachTracing(link.TracingOptions{
+		Program:    prog,
+		AttachType: ebpf.AttachTraceFExit,
+	})
+	if err != nil {
+		_ = prog.Close()
+		return fmt.Errorf("failed to attach tracing: %w", err)
+	}
+
+	if verbose {
+		log.Printf("Tracing kernel function %s", fn)
+	}
+
+	t.llock.Lock()
+	t.progs = append(t.progs, prog)
+	t.klnks = append(t.klnks, l)
 	t.llock.Unlock()
 
 	return nil
