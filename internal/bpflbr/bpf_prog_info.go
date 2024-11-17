@@ -53,6 +53,8 @@ func (b *bpfProgAddrLineInfo) get(addr uintptr) (*bpfProgLineInfo, bool) {
 
 type bpfProgInfo struct {
 	progs []*bpfProgAddrLineInfo
+
+	isLbrProg bool
 }
 
 func newBPFProgInfo(prog *ebpf.Program, engine gapstone.Engine) (*bpfProgInfo, error) {
