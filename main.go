@@ -73,7 +73,7 @@ func main() {
 	defer bpfProgs.Close()
 
 	tracingTargets := bpfProgs.Tracings()
-	assert.SliceNotEmpty(tracingTargets, "No bpf progs found")
+	assert.True(len(tracingTargets)+len(flags.Kfuncs()) != 0, "No tracing target")
 
 	bpfSpec, err := loadLbr()
 	assert.NoErr(err, "Failed to load bpf spec: %v")
@@ -96,11 +96,11 @@ func main() {
 		".data.lbrs": lbrs,
 	}
 
-	tracings, err := bpflbr.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets)
+	tracings, err := bpflbr.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets, flags.Kfuncs())
 	assert.NoVerifierErr(err, "Failed to trace bpf progs: %v")
 	defer tracings.Close()
 
-	err = bpfProgs.AddProgs(tracings.Progs(), engine)
+	err = bpfProgs.AddProgs(tracings.Progs(), engine, true)
 	assert.NoErr(err, "Failed to add bpf progs: %v")
 
 	kallsyms, err = bpflbr.NewKallsyms()

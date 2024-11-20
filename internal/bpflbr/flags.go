@@ -97,7 +97,8 @@ func parseProgsFlag(progs []string) ([]ProgFlag, error) {
 }
 
 type Flags struct {
-	progs []string
+	progs  []string
+	kfuncs []string
 
 	outputFile string
 
@@ -109,6 +110,7 @@ func ParseFlags() (*Flags, error) {
 
 	f := flag.NewFlagSet("bpflbr", flag.ExitOnError)
 	f.StringSliceVarP(&flags.progs, "prog", "p", nil, "bpf prog info for bpflbr in format PROG[,PROG,..], PROG: PROGID[:<prog function name>], PROGID: <prog ID> or 'i/id:<prog ID>' or 'p/pinned:<pinned file>' or 't/tag:<prog tag>' or 'n/name:<prog full name>'; all bpf progs will be traced by default")
+	f.StringSliceVarP(&flags.kfuncs, "kfunc", "k", nil, "kernel functions for bpflbr")
 	f.StringVarP(&flags.outputFile, "output", "o", "", "output file for the result, default is stdout")
 	f.BoolVar(&flags.dumpProg, "dump-jited", false, "dump native insn info of bpf prog, the one bpf prog must be provided by --prog (its function name will be ignored)")
 	f.BoolVarP(&verbose, "verbose", "v", false, "output verbose log")
@@ -118,6 +120,10 @@ func ParseFlags() (*Flags, error) {
 
 func (f *Flags) ParseProgs() ([]ProgFlag, error) {
 	return parseProgsFlag(f.progs)
+}
+
+func (f *Flags) Kfuncs() []string {
+	return f.kfuncs
 }
 
 func (f *Flags) OutputFile() string {
