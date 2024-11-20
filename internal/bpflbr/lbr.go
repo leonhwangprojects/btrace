@@ -130,6 +130,7 @@ func getLineInfo(addr uintptr, progs *bpfProgs, a2l *Addr2Line, ksyms *Kallsyms)
 		ep.funcName = li.funcName
 		ep.fileName = li.fileName
 		ep.fileLine = li.fileLine
+		ep.isProg = true
 		ep.updateInfo()
 		return &ep
 	}
