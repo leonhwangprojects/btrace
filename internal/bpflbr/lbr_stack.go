@@ -18,6 +18,7 @@ type branchEndpoint struct {
 	fileName string
 	fileLine uint32
 	lineInfo string // (${fileName}:${fileLine})
+	isProg   bool
 }
 
 func (b *branchEndpoint) updateInfo() {
