@@ -51,6 +51,7 @@ func DumpProg(pf []ProgFlag) {
 
 	bpfProgs, err := NewBPFProgs(engine, nil, false)
 	assert.NoErr(err, "Failed to get bpf progs: %v")
+	defer bpfProgs.Close()
 
 	info, err := prog.Info()
 	assert.NoErr(err, "Failed to get prog info: %v")

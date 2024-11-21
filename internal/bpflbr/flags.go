@@ -102,7 +102,8 @@ type Flags struct {
 
 	outputFile string
 
-	dumpProg bool
+	disasm      bool
+	disasmBytes uint
 }
 
 func ParseFlags() (*Flags, error) {
@@ -112,7 +113,9 @@ func ParseFlags() (*Flags, error) {
 	f.StringSliceVarP(&flags.progs, "prog", "p", nil, "bpf prog info for bpflbr in format PROG[,PROG,..], PROG: PROGID[:<prog function name>], PROGID: <prog ID> or 'i/id:<prog ID>' or 'p/pinned:<pinned file>' or 't/tag:<prog tag>' or 'n/name:<prog full name>'; all bpf progs will be traced by default")
 	f.StringSliceVarP(&flags.kfuncs, "kfunc", "k", nil, "kernel functions for bpflbr")
 	f.StringVarP(&flags.outputFile, "output", "o", "", "output file for the result, default is stdout")
-	f.BoolVar(&flags.dumpProg, "dump-jited", false, "dump native insn info of bpf prog, the one bpf prog must be provided by --prog (its function name will be ignored)")
+	f.BoolVar(&flags.disasm, "dump-jited", false, "dump native insn info of bpf prog, the one bpf prog must be provided by --prog (its function name will be ignored) [Deprecated, use --disasm instead]")
+	f.BoolVarP(&flags.disasm, "disasm", "d", false, "disasm bpf prog or kernel function")
+	f.UintVarP(&flags.disasmBytes, "disasm-bytes", "B", 0, "disasm bytes of kernel function, must not 0")
 	f.BoolVarP(&verbose, "verbose", "v", false, "output verbose log")
 
 	return &flags, f.Parse(os.Args)
@@ -131,5 +134,9 @@ func (f *Flags) OutputFile() string {
 }
 
 func (f *Flags) DumpProg() bool {
-	return f.dumpProg
+	return f.disasm
+}
+
+func (f *Flags) Disasm() bool {
+	return f.disasm
 }
