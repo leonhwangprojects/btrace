@@ -43,10 +43,15 @@ func (b *bpfProgAddrLineInfo) get(addr uintptr) (*bpfProgLineInfo, bool) {
 		idx--
 	}
 
+	fileName := b.lineInfos[idx].Line.FileName()
+	if fileName != "" && fileName[0] == '.' {
+		fileName = strings.TrimLeft(fileName, "./")
+	}
+
 	var line bpfProgLineInfo
 	line.funcName = b.funcName
 	line.ksymAddr = b.kaddrRange.start
-	line.fileName = strings.TrimLeft(b.lineInfos[idx].Line.FileName(), "./")
+	line.fileName = fileName
 	line.fileLine = b.lineInfos[idx].Line.LineNumber()
 	return &line, true
 }
