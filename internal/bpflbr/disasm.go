@@ -94,11 +94,29 @@ func dumpKfunc(kfunc string, bytes uint) {
 	assert.NoErr(err, "Failed to create engine: %v")
 	defer engine.Close()
 
+	intelSyntax := os.Getenv("BPFLBR_DUMP_INTEL_SYNTAX") == "1"
+	if !intelSyntax {
+		err = engine.SetOption(uint(gapstone.CS_OPT_SYNTAX), uint(gapstone.CS_OPT_SYNTAX_ATT))
+		assert.NoErr(err, "Failed to set syntax: %v")
+	}
+
 	bpfProgs, err := NewBPFProgs(engine, nil, false)
 	assert.NoErr(err, "Failed to get bpf progs: %v")
 	defer bpfProgs.Close()
 
 	var sb strings.Builder
+
+	li := getLineInfo(uintptr(kaddr), bpfProgs, addr2line, kallsyms)
+	fmt.Fprintf(&sb, "; %s+%#x", li.funcName, li.offset)
+	if li.fileName != "" {
+		fmt.Fprintf(&sb, " %s:%d", li.fileName, li.fileLine)
+	}
+	if li.isProg {
+		fmt.Fprintf(&sb, " [bpf]")
+	}
+	fmt.Fprintln(&sb)
+
+	prev := li
 
 	b, pc := data[:], uint64(kaddr)
 	for len(b) != 0 {
@@ -109,6 +127,20 @@ func dumpKfunc(kfunc string, bytes uint) {
 		if err != nil {
 			fmt.Print(sb.String())
 			assert.NoErr(err, "Failed to disasm: %v")
+		}
+
+		li := getLineInfo(uintptr(pc), bpfProgs, addr2line, kallsyms)
+		if (li.fromVmlinux || li.isProg) && (prev.fileName != li.fileName || prev.fileLine != li.fileLine) {
+			fmt.Fprintf(&sb, "; %s+%#x", li.funcName, li.offset)
+			if li.fileName != "" {
+				fmt.Fprintf(&sb, " %s:%d", li.fileName, li.fileLine)
+			}
+			if li.isProg {
+				fmt.Fprintf(&sb, " [bpf]")
+			}
+			fmt.Fprintln(&sb)
+
+			prev = li
 		}
 
 		var opcodes []string

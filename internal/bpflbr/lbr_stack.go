@@ -19,6 +19,7 @@ type branchEndpoint struct {
 	fileLine uint32
 	lineInfo string // (${fileName}:${fileLine})
 	isProg   bool
+	fromVmlinux bool
 }
 
 func (b *branchEndpoint) updateInfo() {
