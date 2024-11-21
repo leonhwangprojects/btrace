@@ -29,14 +29,13 @@ func main() {
 	flags, err := bpflbr.ParseFlags()
 	assert.NoErr(err, "Failed to parse flags: %v")
 
-	progs, err := flags.ParseProgs()
-	assert.NoErr(err, "Failed to parse bpf prog infos: %v")
-
-	if flags.DumpProg() {
-		assert.SliceLen(progs, 1, "Only one --prog is allowed for --dump-jited")
-		bpflbr.DumpProg(progs)
+	if flags.Disasm() {
+		bpflbr.Disasm(flags)
 		return
 	}
+
+	progs, err := flags.ParseProgs()
+	assert.NoErr(err, "Failed to parse bpf prog infos: %v")
 
 	featBPFSpec, err := loadFeat()
 	assert.NoErr(err, "Failed to load feat bpf spec: %v")

@@ -36,8 +36,9 @@ func (ke *KsymEntry) Name() string {
 
 // Kallsyms represents all t/T symbols in /proc/kallsyms.
 type Kallsyms struct {
-	symbols map[uint64]*KsymEntry // addr => symbol
-	addrs   []uint64              // sorted for binary search
+	a2s   map[uint64]*KsymEntry // addr => symbol
+	n2s   map[string]*KsymEntry // name => symbol
+	addrs []uint64              // sorted for binary search
 
 	stext  uint64
 	sysBPF uint64
@@ -52,7 +53,8 @@ func NewKallsyms() (*Kallsyms, error) {
 	defer fd.Close()
 
 	var ks Kallsyms
-	ks.symbols = make(map[uint64]*KsymEntry)
+	ks.a2s = make(map[uint64]*KsymEntry)
+	ks.n2s = make(map[string]*KsymEntry)
 
 	scanner := bufio.NewScanner(fd)
 	for scanner.Scan() {
@@ -80,7 +82,8 @@ func NewKallsyms() (*Kallsyms, error) {
 			}
 			entry.trace = fields[1] == "T"
 
-			ks.symbols[entry.addr] = &entry
+			ks.a2s[entry.addr] = &entry
+			ks.n2s[entry.name] = &entry
 
 			switch entry.name {
 			case "_stext":
@@ -96,7 +99,7 @@ func NewKallsyms() (*Kallsyms, error) {
 		return nil, fmt.Errorf("failed to scan %s: %w", kallsymsFilepath, err)
 	}
 
-	ks.addrs = maps.Keys(ks.symbols)
+	ks.addrs = maps.Keys(ks.a2s)
 	slices.Sort(ks.addrs)
 
 	return &ks, nil
@@ -125,7 +128,7 @@ func (ks *Kallsyms) find(kaddr uintptr) (*KsymEntry, bool) {
 		h := int(uint(i+j) >> 1)
 		if ks.addrs[h] <= addr {
 			if h+1 < total && ks.addrs[h+1] > addr {
-				return ks.symbols[ks.addrs[h]], true
+				return ks.a2s[ks.addrs[h]], true
 			}
 			i = h + 1
 		} else {
@@ -133,5 +136,5 @@ func (ks *Kallsyms) find(kaddr uintptr) (*KsymEntry, bool) {
 		}
 	}
 
-	return ks.symbols[ks.addrs[i-1]], true
+	return ks.a2s[ks.addrs[i-1]], true
 }

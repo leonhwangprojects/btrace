@@ -40,6 +40,12 @@ func True(cond bool, msg string, args ...any) {
 	}
 }
 
+func False(cond bool, msg string, args ...any) {
+	if cond {
+		log.Fatalf(msg, args...)
+	}
+}
+
 func SliceNotEmpty[T any](s []T, msg string, args ...any) {
 	if len(s) == 0 {
 		log.Fatalf(msg, args...)
