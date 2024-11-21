@@ -157,5 +157,6 @@ func getLineInfo(addr uintptr, progs *bpfProgs, a2l *Addr2Line, ksyms *Kallsyms)
 	ep.funcName = li.Func
 	ep.fileName = fileName
 	ep.fileLine = uint32(li.Line)
+	ep.fromVmlinux = true
 	return &ep
 }
