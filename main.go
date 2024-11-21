@@ -95,8 +95,13 @@ func main() {
 		".data.lbrs": lbrs,
 	}
 
-	tracings, err := bpflbr.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets, flags.Kfuncs())
-	assert.NoVerifierErr(err, "Failed to trace bpf progs: %v")
+	kfuncs := flags.Kfuncs()
+	if len(kfuncs) != 0 && len(progs) == 0 {
+		tracingTargets = tracingTargets[:0]
+	}
+
+	tracings, err := bpflbr.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets, kfuncs)
+	assert.NoVerifierErr(err, "Failed to trace: %v")
 	defer tracings.Close()
 
 	err = bpfProgs.AddProgs(tracings.Progs(), engine, true)
