@@ -6,7 +6,6 @@ package bpflbr
 import (
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 
@@ -85,8 +84,7 @@ func DumpProg(pf []ProgFlag) {
 		jited2LineInfos[kaddr] = lines[i]
 	}
 
-	intelSyntax := os.Getenv("BPFLBR_DUMP_INTEL_SYNTAX") == "1"
-	if !intelSyntax {
+	if !disasmIntelSyntax {
 		err = engine.SetOption(uint(gapstone.CS_OPT_SYNTAX), uint(gapstone.CS_OPT_SYNTAX_ATT))
 		assert.NoErr(err, "Failed to set syntax: %v")
 	}

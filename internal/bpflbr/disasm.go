@@ -94,8 +94,7 @@ func dumpKfunc(kfunc string, bytes uint) {
 	assert.NoErr(err, "Failed to create engine: %v")
 	defer engine.Close()
 
-	intelSyntax := os.Getenv("BPFLBR_DUMP_INTEL_SYNTAX") == "1"
-	if !intelSyntax {
+	if !disasmIntelSyntax {
 		err = engine.SetOption(uint(gapstone.CS_OPT_SYNTAX), uint(gapstone.CS_OPT_SYNTAX_ATT))
 		assert.NoErr(err, "Failed to set syntax: %v")
 	}

@@ -20,7 +20,10 @@ const (
 	progFlagDescriptorName   = "name"
 )
 
-var verbose bool
+var (
+	verbose           bool
+	disasmIntelSyntax bool
+)
 
 type ProgFlag struct {
 	progID uint32
@@ -116,6 +119,7 @@ func ParseFlags() (*Flags, error) {
 	f.BoolVar(&flags.disasm, "dump-jited", false, "dump native insn info of bpf prog, the one bpf prog must be provided by --prog (its function name will be ignored) [Deprecated, use --disasm instead]")
 	f.BoolVarP(&flags.disasm, "disasm", "d", false, "disasm bpf prog or kernel function")
 	f.UintVarP(&flags.disasmBytes, "disasm-bytes", "B", 0, "disasm bytes of kernel function, must not 0")
+	f.BoolVar(&disasmIntelSyntax, "disasm-intel-syntax", false, "use Intel asm syntax for disasm, ATT asm syntax by default")
 	f.BoolVarP(&verbose, "verbose", "v", false, "output verbose log")
 
 	return &flags, f.Parse(os.Args)
