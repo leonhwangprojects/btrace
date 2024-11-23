@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
 	"unsafe"
 
@@ -33,6 +34,9 @@ func main() {
 		bpflbr.Disasm(flags)
 		return
 	}
+
+	mode := flags.Mode()
+	assert.True(slices.Contains([]string{bpflbr.TracingModeEntry, bpflbr.TracingModeExit}, mode), "Mode must be exit or entry")
 
 	progs, err := flags.ParseProgs()
 	assert.NoErr(err, "Failed to parse bpf prog infos: %v")
@@ -76,6 +80,7 @@ func main() {
 
 	bpfSpec, err := loadLbr()
 	assert.NoErr(err, "Failed to load bpf spec: %v")
+	delete(bpfSpec.Programs, bpflbr.TracingProgName(flags.OtherMode()))
 
 	numCPU, err := ebpf.PossibleCPU()
 	assert.NoErr(err, "Failed to get possible cpu: %v")

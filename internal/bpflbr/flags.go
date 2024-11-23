@@ -20,9 +20,15 @@ const (
 	progFlagDescriptorName   = "name"
 )
 
+const (
+	TracingModeEntry = "entry"
+	TracingModeExit  = "exit"
+)
+
 var (
 	verbose           bool
 	disasmIntelSyntax bool
+	mode              string
 )
 
 type ProgFlag struct {
@@ -121,6 +127,7 @@ func ParseFlags() (*Flags, error) {
 	f.UintVarP(&flags.disasmBytes, "disasm-bytes", "B", 0, "disasm bytes of kernel function, must not 0")
 	f.BoolVar(&disasmIntelSyntax, "disasm-intel-syntax", false, "use Intel asm syntax for disasm, ATT asm syntax by default")
 	f.BoolVarP(&verbose, "verbose", "v", false, "output verbose log")
+	f.StringVarP(&mode, "mode", "m", TracingModeExit, "mode of lbr tracing, exit or entry")
 
 	return &flags, f.Parse(os.Args)
 }
@@ -143,4 +150,16 @@ func (f *Flags) DumpProg() bool {
 
 func (f *Flags) Disasm() bool {
 	return f.disasm
+}
+
+func (f *Flags) Mode() string {
+	return mode
+}
+
+func (f *Flags) OtherMode() string {
+	if mode == TracingModeExit {
+		return TracingModeEntry
+	}
+
+	return TracingModeExit
 }
