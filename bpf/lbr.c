@@ -20,8 +20,8 @@ struct event {
 
 struct event lbr_events[1] SEC(".data.lbrs");
 
-SEC("fexit")
-int BPF_PROG(fexit_fn)
+static __always_inline int
+emit_lbr_event(void *ctx)
 {
     struct event *event;
     __u64 retval;
@@ -38,6 +38,18 @@ int BPF_PROG(fexit_fn)
     bpf_ringbuf_output(&events, event, sizeof(*event), 0);
 
     return BPF_OK;
+}
+
+SEC("fexit")
+int BPF_PROG(fexit_fn)
+{
+    return emit_lbr_event(ctx);
+}
+
+SEC("fentry")
+int BPF_PROG(fentry_fn)
+{
+    return emit_lbr_event(ctx);
 }
 
 char __license[] SEC("license") = "GPL";

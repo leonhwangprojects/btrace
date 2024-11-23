@@ -13,12 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	// tracingFuncName is the name of the BPF function that is used for
-	// tracing.
-	tracingFuncName = "fexit_fn"
-)
-
 type bpfTracing struct {
 	llock sync.Mutex
 	progs []*ebpf.Program
@@ -81,9 +75,14 @@ func (t *bpfTracing) Close() {
 	_ = errg.Wait()
 }
 
+func TracingProgName(mode string) string {
+	return fmt.Sprintf("f%s_fn", mode)
+}
+
 func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, info bpfTracingInfo) error {
 	spec = spec.Copy()
 
+	tracingFuncName := TracingProgName(mode)
 	progSpec := spec.Programs[tracingFuncName]
 	progSpec.AttachTarget = info.prog
 	progSpec.AttachTo = info.funcName
@@ -124,6 +123,7 @@ func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]
 func (t *bpfTracing) traceFunc(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, fn string) error {
 	spec = spec.Copy()
 
+	tracingFuncName := TracingProgName(mode)
 	progSpec := spec.Programs[tracingFuncName]
 	progSpec.AttachTo = fn
 	progSpec.AttachType = ebpf.AttachTraceFExit
