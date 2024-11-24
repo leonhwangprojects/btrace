@@ -5,6 +5,7 @@ package bpflbr
 
 import (
 	"debug/elf"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -81,19 +82,29 @@ func dumpKfunc(kfunc string, bytes uint) {
 	data, ok := readKcore(kaddr, uint(bytes))
 	assert.True(ok, "Failed to read kcore for %s", kfunc)
 
+	var addr2line *Addr2Line
+
 	vmlinux, err := FindVmlinux()
-	assert.NoErr(err, "Failed to find vmlinux: %v")
-	VerboseLog("Found vmlinux: %s", vmlinux)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			VerboseLog("Dbgsym vmlinux not found")
+		} else {
+			assert.NoErr(err, "Failed to find vmlinux: %v")
+		}
+	}
+	if err == nil {
+		VerboseLog("Found vmlinux: %s", vmlinux)
 
-	textAddr, err := ReadTextAddrFromVmlinux(vmlinux)
-	assert.NoErr(err, "Failed to read .text address from vmlinux: %v")
+		textAddr, err := ReadTextAddrFromVmlinux(vmlinux)
+		assert.NoErr(err, "Failed to read .text address from vmlinux: %v")
 
-	kaslrOffset := textAddr - kallsyms.Stext()
-	VerboseLog("KASLR offset: %#x", kaslrOffset)
+		kaslrOffset := textAddr - kallsyms.Stext()
+		VerboseLog("KASLR offset: 0x%x", kaslrOffset)
 
-	VerboseLog("Creating addr2line from vmlinux ..")
-	addr2line, err := NewAddr2Line(vmlinux, kaslrOffset, kallsyms.SysBPF())
-	assert.NoErr(err, "Failed to create addr2line: %v")
+		VerboseLog("Creating addr2line from vmlinux ..")
+		addr2line, err = NewAddr2Line(vmlinux, kaslrOffset, kallsyms.SysBPF())
+		assert.NoErr(err, "Failed to create addr2line: %v")
+	}
 
 	engine, err := gapstone.New(int(gapstone.CS_ARCH_X86), int(gapstone.CS_MODE_64))
 	assert.NoErr(err, "Failed to create engine: %v")

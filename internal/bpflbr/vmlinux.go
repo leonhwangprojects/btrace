@@ -58,7 +58,7 @@ func FindVmlinux() (string, error) {
 		}
 	}
 
-	return "", errors.New("vmlinux file not found")
+	return "", ErrNotFound
 }
 
 // ReadTextAddrFromVmlinux reads .text section address from vmlinux file.
