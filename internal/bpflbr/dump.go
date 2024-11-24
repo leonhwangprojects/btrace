@@ -31,16 +31,21 @@ func DumpProg(pf []ProgFlag) {
 		log.Fatalf("No prog found")
 	}
 
+	VerboseLog("Reading /proc/kallsyms ..")
 	kallsyms, err := NewKallsyms()
 	assert.NoErr(err, "Failed to read /proc/kallsyms: %v")
 
 	vmlinux, err := FindVmlinux()
 	assert.NoErr(err, "Failed to find vmlinux: %v")
+	VerboseLog("Found vmlinux: %s", vmlinux)
 
 	textAddr, err := ReadTextAddrFromVmlinux(vmlinux)
 	assert.NoErr(err, "Failed to read .text address from vmlinux: %v")
 
 	kaslrOffset := textAddr - kallsyms.Stext()
+	VerboseLog("KASLR offset: %#x", kaslrOffset)
+
+	VerboseLog("Creating addr2line from vmlinux ..")
 	addr2line, err := NewAddr2Line(vmlinux, kaslrOffset, kallsyms.SysBPF())
 	assert.NoErr(err, "Failed to create addr2line: %v")
 
@@ -48,6 +53,7 @@ func DumpProg(pf []ProgFlag) {
 	assert.NoErr(err, "Failed to create engine: %v")
 	defer engine.Close()
 
+	VerboseLog("Disassembling bpf progs ..")
 	bpfProgs, err := NewBPFProgs(engine, nil, false)
 	assert.NoErr(err, "Failed to get bpf progs: %v")
 	defer bpfProgs.Close()

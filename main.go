@@ -54,16 +54,21 @@ func main() {
 	assert.NoErr(err, "Failed to open LBR perf event: %v")
 	defer lbrPerfEvents.Close()
 
+	bpflbr.VerboseLog("Reading /proc/kallsyms ..")
 	kallsyms, err := bpflbr.NewKallsyms()
 	assert.NoErr(err, "Failed to read /proc/kallsyms: %v")
 
 	vmlinux, err := bpflbr.FindVmlinux()
 	assert.NoErr(err, "Failed to find vmlinux: %v")
+	bpflbr.VerboseLog("Found vmlinux: %s", vmlinux)
 
 	textAddr, err := bpflbr.ReadTextAddrFromVmlinux(vmlinux)
 	assert.NoErr(err, "Failed to read .text address from vmlinux: %v")
 
 	kaslrOffset := textAddr - kallsyms.Stext()
+	bpflbr.VerboseLog("KASLR offset: 0x%x", kaslrOffset)
+
+	bpflbr.VerboseLog("Creating addr2line from vmlinux ..")
 	addr2line, err := bpflbr.NewAddr2Line(vmlinux, kaslrOffset, kallsyms.SysBPF())
 	assert.NoErr(err, "Failed to create addr2line: %v")
 
@@ -71,6 +76,7 @@ func main() {
 	assert.NoErr(err, "Failed to create capstone engine: %v")
 	defer engine.Close()
 
+	bpflbr.VerboseLog("Disassembling bpf progs ..")
 	bpfProgs, err := bpflbr.NewBPFProgs(engine, progs, false)
 	assert.NoErr(err, "Failed to get bpf progs: %v")
 	defer bpfProgs.Close()
@@ -78,6 +84,7 @@ func main() {
 	tracingTargets := bpfProgs.Tracings()
 	assert.True(len(tracingTargets)+len(flags.Kfuncs()) != 0, "No tracing target")
 
+	bpflbr.VerboseLog("Tracing bpf progs or kernel functions ..")
 	bpfSpec, err := loadLbr()
 	assert.NoErr(err, "Failed to load bpf spec: %v")
 	delete(bpfSpec.Programs, bpflbr.TracingProgName(flags.OtherMode()))
