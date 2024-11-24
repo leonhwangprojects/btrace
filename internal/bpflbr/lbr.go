@@ -144,6 +144,10 @@ func getLineInfo(addr uintptr, progs *bpfProgs, a2l *Addr2Line, ksyms *Kallsyms)
 		ep.offset = addr - uintptr(ksym.addr)
 	}
 
+	if a2l == nil {
+		return &ep
+	}
+
 	li, err := a2l.get(addr)
 	if err != nil {
 		return &ep
