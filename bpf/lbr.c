@@ -16,6 +16,9 @@ struct event {
     __s64 nr_bytes;
     __s64 func_ret;
     __u64 func_ip;
+    __u32 cpu;
+    __u32 pid;
+    __u8 comm[16];
 } __attribute__((packed));
 
 struct event lbr_events[1] SEC(".data.lbrs");
@@ -34,6 +37,9 @@ emit_lbr_event(void *ctx)
     bpf_get_func_ret(ctx, (void *) &retval); /* required 5.17 kernel. */
     event->func_ret = retval;
     event->func_ip = bpf_get_func_ip(ctx); /* required 5.17 kernel. */
+    event->cpu = cpu;
+    event->pid = bpf_get_current_pid_tgid() >> 32;
+    bpf_get_current_comm(event->comm, sizeof(event->comm));
 
     bpf_ringbuf_output(&events, event, sizeof(*event), 0);
 

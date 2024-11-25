@@ -24,6 +24,9 @@ type Event struct {
 	NrBytes int64
 	Retval  int64
 	FuncIP  uintptr
+	CPU     uint32
+	Pid     uint32
+	Comm    [16]byte
 }
 
 func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *Kallsyms, w io.Writer) error {
@@ -113,7 +116,8 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			}
 		}
 
-		fmt.Fprintf(&sb, "Recv a record for %s with retval=%d :\n", targetName, event.Retval)
+		fmt.Fprintf(&sb, "Recv a record for %s with retval=%d/%#x cpu=%d process=(%d:%s) :\n",
+			targetName, event.Retval, uint64(event.Retval), event.CPU, event.Pid, nullTerminated(event.Comm[:]))
 		stack.output(&sb)
 		fmt.Fprintln(w, sb.String())
 
