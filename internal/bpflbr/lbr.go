@@ -54,57 +54,11 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			return fmt.Errorf("LBR not supported")
 		}
 
-		hasEntries := event.NrBytes > 0 && event.Entries[0] != (LbrEntry{})
-		if !hasEntries {
-			continue
-		}
-
-		progInfo, isProg := progs.funcs[event.FuncIP]
-
-		nrEntries := event.NrBytes / int64(8*3)
-		entries := event.Entries[:nrEntries]
-		if !verbose {
-			if isProg {
-				for i := range entries {
-					if progInfo.contains(entries[i].From) || progInfo.contains(entries[i].To) {
-						entries = entries[i:]
-						break
-					}
-				}
-
-				for i := len(entries) - 1; i >= 0; i-- {
-					if progInfo.contains(entries[i].From) || progInfo.contains(entries[i].To) {
-						entries = entries[:i+1]
-						break
-					}
-				}
-			} else {
-				// Skip the first 14 entries as they are entries for fexit_fn
-				// and bpf_get_branch_snapshot helper.
-				const nrSkip = 14
-
-				entries = entries[nrSkip:]
-			}
-
-			if len(entries) == 0 {
-				continue
-			}
-		}
-
-		lbrEntries := make([]branchEntry, 0, len(entries))
-		for _, entry := range entries {
-			from := getLineInfo(entry.From, progs, addr2line, ksyms)
-			to := getLineInfo(entry.To, progs, addr2line, ksyms)
-			lbrEntries = append(lbrEntries, branchEntry{from, to})
-		}
-
-		last := len(lbrEntries) - 1
-		stack.pushFirstEntry(lbrEntries[last])
-		for i := last - 1; i >= 0; i-- {
-			stack.pushEntry(lbrEntries[i])
-		}
+		hasLbrEntries := event.NrBytes > 0 && event.Entries[0] != (LbrEntry{})
+		hasLbrEntries = hasLbrEntries && ev2stack(event, progs, addr2line, ksyms, stack)
 
 		var targetName string
+		progInfo, isProg := progs.funcs[event.FuncIP]
 		if isProg {
 			targetName = progInfo.funcName() + "[bpf]"
 		} else {
@@ -116,9 +70,18 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			}
 		}
 
-		fmt.Fprintf(&sb, "Recv a record for %s with retval=%d/%#x cpu=%d process=(%d:%s) :\n",
-			targetName, event.Retval, uint64(event.Retval), event.CPU, event.Pid, nullTerminated(event.Comm[:]))
-		stack.output(&sb)
+		fmt.Fprintf(&sb, "Recv a record for %s with", targetName)
+		if mode != TracingModeEntry {
+			fmt.Fprintf(&sb, " retval=%d/%#x", event.Retval, uint64(event.Retval))
+		}
+		fmt.Fprintf(&sb, " cpu=%d process=(%d:%s)", event.CPU, event.Pid, nullTerminated(event.Comm[:]))
+
+		if hasLbrEntries {
+			fmt.Fprintln(&sb, " :")
+			stack.output(&sb)
+		} else {
+			fmt.Fprintln(&sb)
+		}
 		fmt.Fprintln(w, sb.String())
 
 		sb.Reset()
@@ -167,4 +130,53 @@ func getLineInfo(addr uintptr, progs *bpfProgs, a2l *Addr2Line, ksyms *Kallsyms)
 	ep.fileLine = uint32(li.Line)
 	ep.fromVmlinux = true
 	return &ep
+}
+
+func ev2stack(event *Event, progs *bpfProgs, addr2line *Addr2Line, ksyms *Kallsyms, stack *lbrStack) bool {
+	progInfo, isProg := progs.funcs[event.FuncIP]
+
+	nrEntries := event.NrBytes / int64(8*3)
+	entries := event.Entries[:nrEntries]
+	if !verbose {
+		if isProg {
+			for i := range entries {
+				if progInfo.contains(entries[i].From) || progInfo.contains(entries[i].To) {
+					entries = entries[i:]
+					break
+				}
+			}
+
+			for i := len(entries) - 1; i >= 0; i-- {
+				if progInfo.contains(entries[i].From) || progInfo.contains(entries[i].To) {
+					entries = entries[:i+1]
+					break
+				}
+			}
+		} else {
+			// Skip the first 14 entries as they are entries for fexit_fn
+			// and bpf_get_branch_snapshot helper.
+			const nrSkip = 14
+
+			entries = entries[nrSkip:]
+		}
+
+		if len(entries) == 0 {
+			return false
+		}
+	}
+
+	lbrEntries := make([]branchEntry, 0, len(entries))
+	for _, entry := range entries {
+		from := getLineInfo(entry.From, progs, addr2line, ksyms)
+		to := getLineInfo(entry.To, progs, addr2line, ksyms)
+		lbrEntries = append(lbrEntries, branchEntry{from, to})
+	}
+
+	last := len(lbrEntries) - 1
+	stack.pushFirstEntry(lbrEntries[last])
+	for i := last - 1; i >= 0; i-- {
+		stack.pushEntry(lbrEntries[i])
+	}
+
+	return true
 }

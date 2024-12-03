@@ -25,6 +25,13 @@ func (t *bpfTracing) Progs() []*ebpf.Program {
 }
 
 func NewBPFTracing(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, infos []bpfTracingInfo, kfuncs []string) (*bpfTracing, error) {
+	var cfg LbrConfig
+	cfg.SetSuppressLbr(suppressLbr)
+
+	if err := spec.Variables["lbr_config"].Set(cfg); err != nil {
+		return nil, fmt.Errorf("failed to set lbr config: %w", err)
+	}
+
 	var t bpfTracing
 	t.links = make([]link.Link, 0, len(infos))
 
