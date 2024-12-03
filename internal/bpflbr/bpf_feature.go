@@ -17,6 +17,7 @@ type BPFFeatures struct {
 	HasBranchSnapshot bool
 	HasFuncRet        bool
 	HasFuncIP         bool
+	HasGetStackID     bool
 }
 
 func DetectBPFFeatures(spec *ebpf.CollectionSpec) error {
@@ -72,6 +73,10 @@ func DetectBPFFeatures(spec *ebpf.CollectionSpec) error {
 
 	if !feat.HasFuncIP {
 		return errors.New("bpf_get_func_ip() helper not supported")
+	}
+
+	if outputFuncStack && !feat.HasGetStackID {
+		return errors.New("bpf_get_stackid() helper not supported for --output-stack")
 	}
 
 	return nil

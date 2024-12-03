@@ -8,13 +8,22 @@
 
 struct lbr_config {
     __u32 suppress_lbr:1;
-    __u32 pad:31;
+    __u32 output_stack:1;
+    __u32 pad:30;
 };
 
 volatile const struct lbr_config lbr_config = {
     .suppress_lbr = 0,
 };
 #define cfg (&lbr_config)
+
+#define MAX_STACK_DEPTH 50
+struct {
+	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
+	__uint(max_entries, 256);
+	__uint(key_size, sizeof(u32));
+	__uint(value_size, MAX_STACK_DEPTH * sizeof(u64));
+} func_stacks SEC(".maps");
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
@@ -29,6 +38,7 @@ struct event {
     __u32 cpu;
     __u32 pid;
     __u8 comm[16];
+    __s64 func_stack_id;
 } __attribute__((packed));
 
 struct event lbr_events[1] SEC(".data.lbrs");
@@ -51,6 +61,9 @@ emit_lbr_event(void *ctx)
     event->cpu = cpu;
     event->pid = bpf_get_current_pid_tgid() >> 32;
     bpf_get_current_comm(event->comm, sizeof(event->comm));
+    event->func_stack_id = -1;
+    if (cfg->output_stack)
+        event->func_stack_id = bpf_get_stackid(ctx, &func_stacks, BPF_F_FAST_STACK_CMP);
 
     bpf_ringbuf_output(&events, event, sizeof(*event), 0);
 

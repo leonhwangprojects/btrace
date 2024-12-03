@@ -30,7 +30,8 @@ var (
 	disasmIntelSyntax bool
 	mode              string
 
-	suppressLbr bool
+	suppressLbr     bool
+	outputFuncStack bool
 )
 
 type ProgFlag struct {
@@ -131,6 +132,7 @@ func ParseFlags() (*Flags, error) {
 	f.BoolVarP(&verbose, "verbose", "v", false, "output verbose log")
 	f.StringVarP(&mode, "mode", "m", TracingModeExit, "mode of lbr tracing, exit or entry")
 	f.BoolVar(&suppressLbr, "suppress-lbr", false, "suppress LBR perf event")
+	f.BoolVar(&outputFuncStack, "output-stack", false, "output function call stack")
 
 	return &flags, f.Parse(os.Args)
 }

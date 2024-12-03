@@ -110,13 +110,18 @@ func main() {
 	lbrs, err := ebpf.NewMap(lbrsMapSpec)
 	assert.NoErr(err, "Failed to create lbrs map: %v")
 
+	funcStacks, err := ebpf.NewMap(bpfSpec.Maps["func_stacks"])
+	assert.NoErr(err, "Failed to create func_stacks map: %v")
+	defer funcStacks.Close()
+
 	events, err := ebpf.NewMap(bpfSpec.Maps["events"])
 	assert.NoErr(err, "Failed to create events map: %v")
 	defer events.Close()
 
 	reusedMaps := map[string]*ebpf.Map{
-		"events":     events,
-		".data.lbrs": lbrs,
+		"events":      events,
+		".data.lbrs":  lbrs,
+		"func_stacks": funcStacks,
 	}
 
 	kfuncs := flags.Kfuncs()
@@ -160,7 +165,7 @@ func main() {
 	})
 
 	errg.Go(func() error {
-		return bpflbr.Run(reader, bpfProgs, addr2line, kallsyms, w)
+		return bpflbr.Run(reader, bpfProgs, addr2line, kallsyms, funcStacks, w)
 	})
 
 	err = errg.Wait()

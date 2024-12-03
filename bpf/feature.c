@@ -12,6 +12,7 @@ struct bpf_features {
     bool has_branch_snapshot;
     bool has_func_ret;
     bool has_func_ip;
+    bool has_stack_id;
 } features;
 
 SEC("fentry/__x64_sys_nanosleep")
@@ -38,6 +39,11 @@ int detect(struct pt_regs *regs)
      * Added in: 457f44363a88 ("bpf: Implement BPF ring buffer and verifier support for it")
      */
     features.has_ringbuf = bpf_core_enum_value_exists(enum bpf_map_type, BPF_MAP_TYPE_RINGBUF);
+
+    /* Detect if bpf_get_stackid() helper is supported.
+     * Added in: d5a3b1f69186 ("bpf: introduce BPF_MAP_TYPE_STACK_TRACE")
+     */
+    features.has_stack_id = bpf_core_enum_value_exists(enum bpf_func_id, BPF_FUNC_get_stackid);
 
     return 0;
 }
