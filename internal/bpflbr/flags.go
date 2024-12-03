@@ -29,6 +29,8 @@ var (
 	verbose           bool
 	disasmIntelSyntax bool
 	mode              string
+
+	suppressLbr bool
 )
 
 type ProgFlag struct {
@@ -128,6 +130,7 @@ func ParseFlags() (*Flags, error) {
 	f.BoolVar(&disasmIntelSyntax, "disasm-intel-syntax", false, "use Intel asm syntax for disasm, ATT asm syntax by default")
 	f.BoolVarP(&verbose, "verbose", "v", false, "output verbose log")
 	f.StringVarP(&mode, "mode", "m", TracingModeExit, "mode of lbr tracing, exit or entry")
+	f.BoolVar(&suppressLbr, "suppress-lbr", false, "suppress LBR perf event")
 
 	return &flags, f.Parse(os.Args)
 }
@@ -154,6 +157,10 @@ func (f *Flags) Disasm() bool {
 
 func (f *Flags) Mode() string {
 	return mode
+}
+
+func (f *Flags) SuppressLbr() bool {
+	return suppressLbr
 }
 
 func (f *Flags) OtherMode() string {

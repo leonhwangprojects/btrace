@@ -6,6 +6,16 @@
 
 #define MAX_LBR_ENTRIES 32
 
+struct lbr_config {
+    __u32 suppress_lbr:1;
+    __u32 pad:31;
+};
+
+volatile const struct lbr_config lbr_config = {
+    .suppress_lbr = 0,
+};
+#define cfg (&lbr_config)
+
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
     __uint(max_entries, 4096<<8);
@@ -33,7 +43,8 @@ emit_lbr_event(void *ctx)
     cpu = bpf_get_smp_processor_id();
     event = &lbr_events[cpu];
 
-    event->nr_bytes = bpf_get_branch_snapshot(event->lbr, sizeof(event->lbr), 0); /* required 5.16 kernel. */
+    if (!cfg->suppress_lbr)
+        event->nr_bytes = bpf_get_branch_snapshot(event->lbr, sizeof(event->lbr), 0); /* required 5.16 kernel. */
     bpf_get_func_ret(ctx, (void *) &retval); /* required 5.17 kernel. */
     event->func_ret = retval;
     event->func_ip = bpf_get_func_ip(ctx); /* required 5.17 kernel. */

@@ -47,12 +47,14 @@ func main() {
 	err = bpflbr.DetectBPFFeatures(featBPFSpec)
 	assert.NoErr(err, "Failed to detect bpf features: %v")
 
-	lbrPerfEvents, err := bpflbr.OpenLbrPerfEvent()
-	if err != nil && errors.Is(err, unix.ENOENT) {
-		log.Fatalln("LBR is not supported on current system")
+	if !flags.SuppressLbr() {
+		lbrPerfEvents, err := bpflbr.OpenLbrPerfEvent()
+		if err != nil && errors.Is(err, unix.ENOENT) {
+			log.Fatalln("LBR is not supported on current system")
+		}
+		assert.NoErr(err, "Failed to open LBR perf event: %v")
+		defer lbrPerfEvents.Close()
 	}
-	assert.NoErr(err, "Failed to open LBR perf event: %v")
-	defer lbrPerfEvents.Close()
 
 	bpflbr.VerboseLog("Reading /proc/kallsyms ..")
 	kallsyms, err := bpflbr.NewKallsyms()
