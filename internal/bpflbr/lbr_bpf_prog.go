@@ -5,6 +5,7 @@ package bpflbr
 
 const (
 	lbrConfigFlagSuppressLbrIdx = 0 + iota
+	lbrConfigFlagOutputStackIdx
 )
 
 type LbrConfig struct {
@@ -14,5 +15,11 @@ type LbrConfig struct {
 func (cfg *LbrConfig) SetSuppressLbr(v bool) {
 	if v {
 		cfg.Flags |= 1 << lbrConfigFlagSuppressLbrIdx
+	}
+}
+
+func (cfg *LbrConfig) SetOutputStack(v bool) {
+	if v {
+		cfg.Flags |= 1 << lbrConfigFlagOutputStackIdx
 	}
 }
