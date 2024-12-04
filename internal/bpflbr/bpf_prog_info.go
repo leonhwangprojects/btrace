@@ -21,8 +21,8 @@ type bpfProgAddrLineInfo struct {
 	kaddrRange bpfProgKaddrRange
 	funcName   string
 
-	jitedLineInfo []uintptr      // ordered
-	lineInfos     []btf.LineInfo // mapping 1:1 with jitedLineInfo
+	jitedLineInfo []uintptr        // ordered
+	lineInfos     []btf.LineOffset // mapping 1:1 with jitedLineInfo
 }
 
 type bpfProgLineInfo struct {
@@ -73,14 +73,9 @@ func newBPFProgInfo(prog *ebpf.Program, engine gapstone.Engine) (*bpfProgInfo, e
 		return nil, fmt.Errorf("failed to get func infos: %w", err)
 	}
 
-	lineInfos, err := pinfo.LineInfos()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get line infos: %w", err)
-	}
-
-	lines := lineInfos.Lines()
+	lines, _ := pinfo.LineInfos()
 	jitedInsns, _ := pinfo.JitedInsns()
-	jitedKsyms, _ := pinfo.KsymAddrs()
+	jitedKsyms, _ := pinfo.JitedKsymAddrs()
 	jitedFuncLens, _ := pinfo.JitedFuncLens()
 	jitedLineInfos, _ := pinfo.JitedLineInfos()
 
@@ -96,7 +91,7 @@ func newBPFProgInfo(prog *ebpf.Program, engine gapstone.Engine) (*bpfProgInfo, e
 		return nil, fmt.Errorf("line info number %d != jited line info number %d", len(lines), len(jitedLineInfos))
 	}
 
-	jited2li := make(map[uint64]btf.LineInfo, len(jitedLineInfos))
+	jited2li := make(map[uint64]btf.LineOffset, len(jitedLineInfos))
 	for i, kaddr := range jitedLineInfos {
 		jited2li[kaddr] = lines[i]
 	}
