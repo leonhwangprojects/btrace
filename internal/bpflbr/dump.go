@@ -73,7 +73,7 @@ func DumpProg(pf []ProgFlag) {
 	assert.NoErr(err, "Failed to get prog info: %v")
 
 	jitedInsns, _ := info.JitedInsns()
-	jitedKsyms, _ := info.KsymAddrs()
+	jitedKsyms, _ := info.JitedKsymAddrs()
 	jitedFuncLens, _ := info.JitedFuncLens()
 	jitedLineInfos, _ := info.JitedLineInfos()
 	assert.SliceNotEmpty(jitedInsns, "No jited insns")
@@ -82,10 +82,8 @@ func DumpProg(pf []ProgFlag) {
 	// jitedFuncLens are the insns length of each function.
 	// Then, jitedInsns can be split into len(jitedFuncLens) functions with each function having jitedFuncLens[i] insns.
 
-	li, err := info.LineInfos()
+	lines, err := info.LineInfos()
 	assert.NoErr(err, "Failed to get line infos: %v")
-
-	lines := li.Lines()
 	assert.Equal(len(lines), len(jitedLineInfos), "Line info mismatch: %d != %d (jited)", len(lines), len(jitedLineInfos))
 
 	// Each jitedLineInfo is corresponding to a lineInfo.
@@ -96,7 +94,7 @@ func DumpProg(pf []ProgFlag) {
 	// ksym addr + insn offset = jited line info addr.
 	// jited line info addr => line info.
 
-	jited2LineInfos := make(map[uint64]btf.LineInfo, len(jitedLineInfos))
+	jited2LineInfos := make(map[uint64]btf.LineOffset, len(jitedLineInfos))
 	for i, kaddr := range jitedLineInfos {
 		jited2LineInfos[kaddr] = lines[i]
 	}
