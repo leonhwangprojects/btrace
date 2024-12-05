@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -36,7 +37,8 @@ func main() {
 	}
 
 	mode := flags.Mode()
-	assert.True(slices.Contains([]string{bpflbr.TracingModeEntry, bpflbr.TracingModeExit}, mode), "Mode must be exit or entry")
+	assert.True(slices.Contains([]string{bpflbr.TracingModeEntry, bpflbr.TracingModeExit}, mode),
+		fmt.Sprintf("Mode (%s) must be exit or entry", mode))
 
 	progs, err := flags.ParseProgs()
 	assert.NoErr(err, "Failed to parse bpf prog infos: %v")
