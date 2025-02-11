@@ -199,6 +199,7 @@ func dumpKfunc(kfunc string, bytes uint) {
 		if err != nil {
 			if b[0] == 0x82 {
 				printInsnInfo(pc, "82", "(bad)", "")
+				fmt.Fprintln(&sb)
 
 				pc++
 				b = b[1:]

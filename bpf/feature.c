@@ -13,6 +13,7 @@ struct bpf_features {
     bool has_func_ret;
     bool has_func_ip;
     bool has_stack_id;
+    bool has_read_branch_snapshot;
 } features;
 
 SEC("fentry/__x64_sys_nanosleep")
@@ -44,6 +45,8 @@ int detect(struct pt_regs *regs)
      * Added in: d5a3b1f69186 ("bpf: introduce BPF_MAP_TYPE_STACK_TRACE")
      */
     features.has_stack_id = bpf_core_enum_value_exists(enum bpf_func_id, BPF_FUNC_get_stackid);
+
+    features.has_read_branch_snapshot = bpf_core_enum_value_exists(enum bpf_func_id, BPF_FUNC_read_branch_snapshot);
 
     return 0;
 }

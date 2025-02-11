@@ -26,10 +26,11 @@ func (t *bpfTracing) Progs() []*ebpf.Program {
 	return t.progs
 }
 
-func NewBPFTracing(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, infos []bpfTracingInfo, kfuncs []string) (*bpfTracing, error) {
+func NewBPFTracing(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, infos []bpfTracingInfo, kfuncs []string, feat *BPFFeatures) (*bpfTracing, error) {
 	var cfg LbrConfig
 	cfg.SetSuppressLbr(suppressLbr)
 	cfg.SetOutputStack(outputFuncStack)
+	cfg.SetReadBranchSnapshot(feat.HasReadBranchSnapshot)
 	cfg.FilterPid = uint32(filterPid)
 
 	if err := spec.Variables["lbr_config"].Set(cfg); err != nil {

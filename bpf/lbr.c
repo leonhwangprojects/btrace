@@ -11,7 +11,8 @@ __u32 ready SEC(".data.ready") = 0;
 struct lbr_config {
     __u32 suppress_lbr:1;
     __u32 output_stack:1;
-    __u32 pad:30;
+    __u32 have_read_branch_snapshot:1;
+    __u32 pad:29;
     __u32 pid;
 };
 
@@ -57,8 +58,14 @@ emit_lbr_event(void *ctx)
     cpu = bpf_get_smp_processor_id();
     event = &lbr_events[cpu];
 
-    if (!cfg->suppress_lbr)
-        event->nr_bytes = bpf_get_branch_snapshot(event->lbr, sizeof(event->lbr), 0); /* required 5.16 kernel. */
+    if (!cfg->suppress_lbr) {
+        if (cfg->have_read_branch_snapshot)
+            event->nr_bytes = bpf_read_branch_snapshot(ctx, event->lbr, sizeof(event->lbr));
+        else
+            event->nr_bytes = bpf_get_branch_snapshot(event->lbr, sizeof(event->lbr), 0);
+    } else {
+        event->nr_bytes = 0;
+    }
 
     /* Other filters must be after bpf_get_branch_snapshot() to avoid polluting
      * LBR entries.

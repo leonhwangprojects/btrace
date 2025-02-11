@@ -46,7 +46,7 @@ func main() {
 	featBPFSpec, err := loadFeat()
 	assert.NoErr(err, "Failed to load feat bpf spec: %v")
 
-	err = bpflbr.DetectBPFFeatures(featBPFSpec)
+	feat, err := bpflbr.DetectBPFFeatures(featBPFSpec)
 	assert.NoErr(err, "Failed to detect bpf features: %v")
 
 	if !flags.SuppressLbr() {
@@ -141,7 +141,7 @@ func main() {
 		log.Printf("bpflbr is tracing %d kernel functions, this may take a while", len(kfuncs))
 	}
 
-	tracings, err := bpflbr.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets, kfuncs)
+	tracings, err := bpflbr.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets, kfuncs, feat)
 	assert.NoVerifierErr(err, "Failed to trace: %v")
 	defer tracings.Close()
 	assert.True(tracings.HaveTracing(), "No tracing target")

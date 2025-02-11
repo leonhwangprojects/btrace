@@ -12,23 +12,24 @@ import (
 )
 
 type BPFFeatures struct {
-	KprobeHappened    bool
-	HasRingbuf        bool
-	HasBranchSnapshot bool
-	HasFuncRet        bool
-	HasFuncIP         bool
-	HasGetStackID     bool
+	KprobeHappened        bool
+	HasRingbuf            bool
+	HasBranchSnapshot     bool
+	HasFuncRet            bool
+	HasFuncIP             bool
+	HasGetStackID         bool
+	HasReadBranchSnapshot bool
 }
 
-func DetectBPFFeatures(spec *ebpf.CollectionSpec) error {
+func DetectBPFFeatures(spec *ebpf.CollectionSpec) (*BPFFeatures, error) {
 	mapSpec := spec.Maps[".bss"]
 	if mapSpec == nil {
-		return errors.New("missing .bss map")
+		return nil, errors.New("missing .bss map")
 	}
 
 	bss, err := ebpf.NewMap(mapSpec)
 	if err != nil {
-		return fmt.Errorf("failed to create .bss map: %w", err)
+		return nil, fmt.Errorf("failed to create .bss map: %w", err)
 	}
 
 	coll, err := ebpf.NewCollectionWithOptions(spec, ebpf.CollectionOptions{
@@ -37,7 +38,7 @@ func DetectBPFFeatures(spec *ebpf.CollectionSpec) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create bpf collection: %w", err)
+		return nil, fmt.Errorf("failed to create bpf collection: %w", err)
 	}
 	defer coll.Close()
 
@@ -52,32 +53,32 @@ func DetectBPFFeatures(spec *ebpf.CollectionSpec) error {
 
 	var feat BPFFeatures
 	if err := bss.Lookup(uint32(0), &feat); err != nil {
-		return fmt.Errorf("failed to lookup .bss: %w", err)
+		return nil, fmt.Errorf("failed to lookup .bss: %w", err)
 	}
 
 	if !feat.KprobeHappened {
-		return errors.New("detection not happened")
+		return nil, errors.New("detection not happened")
 	}
 
 	if !feat.HasRingbuf {
-		return errors.New("ringbuf map not supported")
+		return nil, errors.New("ringbuf map not supported")
 	}
 
 	if !feat.HasBranchSnapshot {
-		return errors.New("bpf_get_branch_snapshot() helper not supported")
+		return nil, errors.New("bpf_get_branch_snapshot() helper not supported")
 	}
 
 	if !feat.HasFuncRet {
-		return errors.New("bpf_get_func_ret() helper not supported")
+		return nil, errors.New("bpf_get_func_ret() helper not supported")
 	}
 
 	if !feat.HasFuncIP {
-		return errors.New("bpf_get_func_ip() helper not supported")
+		return nil, errors.New("bpf_get_func_ip() helper not supported")
 	}
 
 	if outputFuncStack && !feat.HasGetStackID {
-		return errors.New("bpf_get_stackid() helper not supported for --output-stack")
+		return nil, errors.New("bpf_get_stackid() helper not supported for --output-stack")
 	}
 
-	return nil
+	return &feat, nil
 }

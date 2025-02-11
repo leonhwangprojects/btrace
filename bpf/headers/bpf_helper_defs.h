@@ -4720,4 +4720,22 @@ static void *(*bpf_cgrp_storage_get)(void *map, struct cgroup *cgroup, void *val
  */
 static long (*bpf_cgrp_storage_delete)(void *map, struct cgroup *cgroup) = (void *) 211;
 
-
+/*
+ * long bpf_read_branch_snapshot(void *ctx, void *buf, u32 size)
+ *
+ *  Like bpf_get_branch_snapshot, it reads the branch snapshot from
+ *  trampoline's cache.
+ *  The branch snapshot was captured in trampoline before running
+ *  any fentry or fexit prog. It is to avoid unnecessary branch
+ *  records related to running fentry or fexit progs in trampoline.
+ *
+ * Returns
+ *  On success, number of bytes copied to *buf*. On error, a
+ *  negative value.
+ *
+ *  **-EINVAL** if *size* is zero or not times of sizeof struct
+ *  perf_branch_entry.
+ *
+ *  **-ENOENT** if architecture does not support branch records.
+ */
+static long (*bpf_read_branch_snapshot)(void *ctx, void *entries, __u32 size) = (void *) 212;
