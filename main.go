@@ -141,6 +141,7 @@ func main() {
 		log.Printf("bpflbr is tracing %d kernel functions, this may take a while", len(kfuncs))
 	}
 
+	feat.HasReadBranchSnapshot = feat.HasReadBranchSnapshot && !flags.UseGetBranchSnapshot()
 	tracings, err := bpflbr.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets, kfuncs, feat)
 	assert.NoVerifierErr(err, "Failed to trace: %v")
 	defer tracings.Close()

@@ -131,6 +131,8 @@ type Flags struct {
 
 	disasm      bool
 	disasmBytes uint
+
+	useGetBranchSnapshot bool
 }
 
 func ParseFlags() (*Flags, error) {
@@ -149,6 +151,7 @@ func ParseFlags() (*Flags, error) {
 	f.BoolVar(&suppressLbr, "suppress-lbr", false, "suppress LBR perf event")
 	f.BoolVar(&outputFuncStack, "output-stack", false, "output function call stack")
 	f.Uint32Var(&filterPid, "filter-pid", 0, "filter pid for tracing")
+	f.BoolVar(&flags.useGetBranchSnapshot, "use-get-branch-snapshot", false, "use bpf_get_branch_snapshot always instead of bpf_read_branch_snapshot")
 
 	err := f.Parse(os.Args)
 
@@ -191,4 +194,8 @@ func (f *Flags) OtherMode() string {
 	}
 
 	return TracingModeExit
+}
+
+func (f *Flags) UseGetBranchSnapshot() bool {
+	return f.useGetBranchSnapshot
 }
