@@ -1,7 +1,7 @@
 // Copyright 2024 Leon Hwang.
 // SPDX-License-Identifier: Apache-2.0
 
-package bpflbr
+package btrace
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/knightsc/gapstone"
 
-	"github.com/Asphaltt/bpflbr/internal/assert"
+	"github.com/leonhwangprojects/btrace/internal/assert"
 )
 
 func DumpProg(pf []ProgFlag) {

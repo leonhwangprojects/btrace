@@ -1,7 +1,7 @@
 // Copyright 2024 Leon Hwang.
 // SPDX-License-Identifier: Apache-2.0
 
-package bpflbr
+package btrace
 
 import (
 	"errors"
@@ -31,7 +31,7 @@ var (
 	disasmIntelSyntax bool
 	mode              string
 
-	suppressLbr     bool
+	outputLbr       bool
 	outputFuncStack bool
 	filterPid       uint32
 	kfuncAllKmods   bool
@@ -144,8 +144,8 @@ type Flags struct {
 func ParseFlags() (*Flags, error) {
 	var flags Flags
 
-	f := flag.NewFlagSet("bpflbr", flag.ExitOnError)
-	f.StringSliceVarP(&flags.progs, "prog", "p", nil, "bpf prog info for bpflbr in format PROG[,PROG,..], PROG: PROGID[:<prog function name>], PROGID: <prog ID> or 'i/id:<prog ID>' or 'p/pinned:<pinned file>' or 't/tag:<prog tag>' or 'n/name:<prog full name>' or 'pid:<pid>'; all bpf progs will be traced if '*' is specified")
+	f := flag.NewFlagSet("btrace", flag.ExitOnError)
+	f.StringSliceVarP(&flags.progs, "prog", "p", nil, "bpf prog info for btrace in format PROG[,PROG,..], PROG: PROGID[:<prog function name>], PROGID: <prog ID> or 'i/id:<prog ID>' or 'p/pinned:<pinned file>' or 't/tag:<prog tag>' or 'n/name:<prog full name>' or 'pid:<pid>'; all bpf progs will be traced if '*' is specified")
 	f.StringSliceVarP(&flags.kfuncs, "kfunc", "k", nil, "filter kernel functions by shell wildcards way")
 	f.BoolVar(&kfuncAllKmods, "kfunc-all-kmods", false, "filter functions in all kernel modules")
 	f.StringVarP(&flags.outputFile, "output", "o", "", "output file for the result, default is stdout")
@@ -153,8 +153,8 @@ func ParseFlags() (*Flags, error) {
 	f.UintVarP(&flags.disasmBytes, "disasm-bytes", "B", 0, "disasm bytes of kernel function, 0 to guess it automatically")
 	f.BoolVar(&disasmIntelSyntax, "disasm-intel-syntax", false, "use Intel asm syntax for disasm, ATT asm syntax by default")
 	f.BoolVarP(&verbose, "verbose", "v", false, "output verbose log")
-	f.StringVarP(&mode, "mode", "m", TracingModeExit, "mode of lbr tracing, exit or entry")
-	f.BoolVar(&suppressLbr, "suppress-lbr", false, "suppress LBR perf event")
+	f.StringVarP(&mode, "mode", "m", TracingModeExit, "mode of btrace, exit or entry")
+	f.BoolVar(&outputLbr, "output-lbr", false, "output LBR perf event")
 	f.BoolVar(&outputFuncStack, "output-stack", false, "output function call stack")
 	f.Uint32Var(&filterPid, "filter-pid", 0, "filter pid for tracing")
 	f.UintVar(&limitEvents, "limit-events", 0, "limited number events to output, 0 to output all events")
@@ -190,8 +190,8 @@ func (f *Flags) Mode() string {
 	return mode
 }
 
-func (f *Flags) SuppressLbr() bool {
-	return suppressLbr
+func (f *Flags) OutputLbr() bool {
+	return outputLbr
 }
 
 func (f *Flags) OtherMode() string {

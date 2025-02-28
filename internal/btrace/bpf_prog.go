@@ -1,7 +1,7 @@
 // Copyright 2024 Leon Hwang.
 // SPDX-License-Identifier: Apache-2.0
 
-package bpflbr
+package btrace
 
 import (
 	"fmt"
@@ -53,20 +53,20 @@ func NewBPFProgs(pflags []ProgFlag, onlyPrepare, disasm bool) (*bpfProgs, error)
 	return &progs, nil
 }
 
-func (b *bpfProgs) addProg(prog *ebpf.Program, id ebpf.ProgramID, isLbr bool) error {
+func (b *bpfProgs) addProg(prog *ebpf.Program, id ebpf.ProgramID, isBtrace bool) error {
 	progInfo, err := newBPFProgInfo(prog)
 	if err != nil {
 		return fmt.Errorf("failed to create BPF program info for ID(%d): %w", id, err)
 	}
 
-	progInfo.isLbrProg = isLbr
+	progInfo.isBtraceProg = isBtrace
 	for _, p := range progInfo.progs {
 		b.funcs[p.kaddrRange.start] = p
 	}
 	return nil
 }
 
-func (b *bpfProgs) AddProgs(progs []*ebpf.Program, isLbr bool) error {
+func (b *bpfProgs) AddProgs(progs []*ebpf.Program, isBtrace bool) error {
 	for _, prog := range progs {
 		info, err := prog.Info()
 		if err != nil {
@@ -78,7 +78,7 @@ func (b *bpfProgs) AddProgs(progs []*ebpf.Program, isLbr bool) error {
 			return fmt.Errorf("failed to get prog ID")
 		}
 
-		err = b.addProg(prog, id, isLbr)
+		err = b.addProg(prog, id, isBtrace)
 		if err != nil {
 			return fmt.Errorf("failed to add BPF program: %w", err)
 		}

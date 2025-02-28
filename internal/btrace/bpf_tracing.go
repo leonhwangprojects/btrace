@@ -1,7 +1,7 @@
 // Copyright 2024 Leon Hwang.
 // SPDX-License-Identifier: Apache-2.0
 
-package bpflbr
+package btrace
 
 import (
 	"errors"
@@ -26,9 +26,9 @@ func (t *bpfTracing) Progs() []*ebpf.Program {
 	return t.progs
 }
 
-func setLbrConfig(spec *ebpf.CollectionSpec, args []FuncParamFlags, isRetStr bool) error {
-	var cfg LbrConfig
-	cfg.SetSuppressLbr(suppressLbr)
+func setBtraceConfig(spec *ebpf.CollectionSpec, args []FuncParamFlags, isRetStr bool) error {
+	var cfg BtraceConfig
+	cfg.SetOutputLbr(outputLbr)
 	cfg.SetOutputStack(outputFuncStack)
 	cfg.SetIsRetStr(isRetStr)
 	cfg.FilterPid = filterPid
@@ -37,8 +37,8 @@ func setLbrConfig(spec *ebpf.CollectionSpec, args []FuncParamFlags, isRetStr boo
 		cfg.FnArgs[i] = arg
 	}
 
-	if err := spec.Variables["lbr_config"].Set(cfg); err != nil {
-		return fmt.Errorf("failed to set lbr config: %w", err)
+	if err := spec.Variables["btrace_config"].Set(cfg); err != nil {
+		return fmt.Errorf("failed to set btrace config: %w", err)
 	}
 
 	return nil
@@ -109,8 +109,8 @@ func TracingProgName(mode string) string {
 func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, info bpfTracingInfo) error {
 	spec = spec.Copy()
 
-	if err := setLbrConfig(spec, info.params, false); err != nil {
-		return fmt.Errorf("failed to set lbr config: %w", err)
+	if err := setBtraceConfig(spec, info.params, false); err != nil {
+		return fmt.Errorf("failed to set btrace config: %w", err)
 	}
 
 	attachType := ebpf.AttachTraceFExit
@@ -159,8 +159,8 @@ func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]
 func (t *bpfTracing) traceFunc(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, fn KFunc) error {
 	spec = spec.Copy()
 
-	if err := setLbrConfig(spec, fn.Prms, fn.IsRetStr); err != nil {
-		return fmt.Errorf("failed to set lbr config: %w", err)
+	if err := setBtraceConfig(spec, fn.Prms, fn.IsRetStr); err != nil {
+		return fmt.Errorf("failed to set btrace config: %w", err)
 	}
 
 	attachType := ebpf.AttachTraceFExit

@@ -1,7 +1,7 @@
 // Copyright 2024 Leon Hwang.
 // SPDX-License-Identifier: Apache-2.0
 
-package bpflbr
+package btrace
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
 
-	"github.com/Asphaltt/bpflbr/internal/btfx"
+	"github.com/leonhwangprojects/btrace/internal/btfx"
 )
 
 type bpfTracingInfo struct {

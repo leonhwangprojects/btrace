@@ -1,16 +1,16 @@
 // Copyright 2024 Leon Hwang.
 // SPDX-License-Identifier: Apache-2.0
 
-package bpflbr
+package btrace
 
 import (
 	"fmt"
 	"log"
 	"os"
 
-	"github.com/Asphaltt/bpflbr/internal/btfx"
 	"github.com/cilium/ebpf/btf"
 	"github.com/gobwas/glob"
+	"github.com/leonhwangprojects/btrace/internal/btfx"
 )
 
 const (

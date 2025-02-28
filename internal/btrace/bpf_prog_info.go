@@ -1,7 +1,7 @@
 // Copyright 2024 Leon Hwang.
 // SPDX-License-Identifier: Apache-2.0
 
-package bpflbr
+package btrace
 
 import (
 	"fmt"
@@ -68,7 +68,7 @@ func (b *bpfProgFuncInfo) get(addr uintptr) (*bpfProgLineInfo, bool) {
 type bpfProgInfo struct {
 	progs []*bpfProgFuncInfo
 
-	isLbrProg bool
+	isBtraceProg bool
 }
 
 func newBPFProgInfo(prog *ebpf.Program) (*bpfProgInfo, error) {

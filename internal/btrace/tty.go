@@ -1,7 +1,7 @@
 // Copyright 2025 Leon Hwang.
 // SPDX-License-Identifier: Apache-2.0
 
-package bpflbr
+package btrace
 
 import (
 	"golang.org/x/sys/unix"

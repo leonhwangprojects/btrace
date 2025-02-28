@@ -1,7 +1,7 @@
 // Copyright 2024 Leon Hwang.
 // SPDX-License-Identifier: Apache-2.0
 
-package bpflbr
+package btrace
 
 import (
 	"errors"
@@ -49,7 +49,7 @@ func DetectBPFFeatures(spec *ebpf.CollectionSpec) error {
 		return errors.New("ringbuf map not supported")
 	}
 
-	if !feat.HasBranchSnapshot && !suppressLbr {
+	if !feat.HasBranchSnapshot && outputLbr {
 		return errors.New("bpf_get_branch_snapshot() helper not supported")
 	}
 

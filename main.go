@@ -20,24 +20,24 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
 
-	"github.com/Asphaltt/bpflbr/internal/assert"
-	"github.com/Asphaltt/bpflbr/internal/bpflbr"
+	"github.com/leonhwangprojects/btrace/internal/assert"
+	"github.com/leonhwangprojects/btrace/internal/btrace"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang lbr ./bpf/lbr.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -Wall
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang btrace ./bpf/btrace.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -Wall
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang feat ./bpf/feature.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -Wall
 
 func main() {
-	flags, err := bpflbr.ParseFlags()
+	flags, err := btrace.ParseFlags()
 	assert.NoErr(err, "Failed to parse flags: %v")
 
 	if flags.Disasm() {
-		bpflbr.Disasm(flags)
+		btrace.Disasm(flags)
 		return
 	}
 
 	mode := flags.Mode()
-	assert.True(slices.Contains([]string{bpflbr.TracingModeEntry, bpflbr.TracingModeExit}, mode),
+	assert.True(slices.Contains([]string{btrace.TracingModeEntry, btrace.TracingModeExit}, mode),
 		fmt.Sprintf("Mode (%s) must be exit or entry", mode))
 
 	progs, err := flags.ParseProgs()
@@ -46,11 +46,11 @@ func main() {
 	featBPFSpec, err := loadFeat()
 	assert.NoErr(err, "Failed to load feat bpf spec: %v")
 
-	err = bpflbr.DetectBPFFeatures(featBPFSpec)
+	err = btrace.DetectBPFFeatures(featBPFSpec)
 	assert.NoErr(err, "Failed to detect bpf features: %v")
 
-	if !flags.SuppressLbr() {
-		lbrPerfEvents, err := bpflbr.OpenLbrPerfEvent()
+	if flags.OutputLbr() {
+		lbrPerfEvents, err := btrace.OpenLbrPerfEvent()
 		if err != nil &&
 			(errors.Is(err, unix.ENOENT) || errors.Is(err, unix.EOPNOTSUPP)) {
 			log.Fatalln("LBR is not supported on current system")
@@ -59,29 +59,29 @@ func main() {
 		defer lbrPerfEvents.Close()
 	}
 
-	bpflbr.VerboseLog("Reading /proc/kallsyms ..")
-	kallsyms, err := bpflbr.NewKallsyms()
+	btrace.VerboseLog("Reading /proc/kallsyms ..")
+	kallsyms, err := btrace.NewKallsyms()
 	assert.NoErr(err, "Failed to read /proc/kallsyms: %v")
 
-	var addr2line *bpflbr.Addr2Line
+	var addr2line *btrace.Addr2Line
 
-	vmlinux, err := bpflbr.FindVmlinux()
+	vmlinux, err := btrace.FindVmlinux()
 	if err != nil {
-		if errors.Is(err, bpflbr.ErrNotFound) {
-			bpflbr.VerboseLog("Dbgsym vmlinux not found")
+		if errors.Is(err, btrace.ErrNotFound) {
+			btrace.VerboseLog("Dbgsym vmlinux not found")
 		} else {
 			assert.NoErr(err, "Failed to find vmlinux: %v")
 		}
 	}
 	if err == nil {
-		bpflbr.VerboseLog("Found vmlinux: %s", vmlinux)
+		btrace.VerboseLog("Found vmlinux: %s", vmlinux)
 
-		textAddr, err := bpflbr.ReadTextAddrFromVmlinux(vmlinux)
+		textAddr, err := btrace.ReadTextAddrFromVmlinux(vmlinux)
 		assert.NoErr(err, "Failed to read .text address from vmlinux: %v")
 
-		bpflbr.VerboseLog("Creating addr2line from vmlinux ..")
-		kaslr := bpflbr.NewKaslr(kallsyms.Stext(), textAddr)
-		addr2line, err = bpflbr.NewAddr2Line(vmlinux, kaslr, kallsyms.SysBPF())
+		btrace.VerboseLog("Creating addr2line from vmlinux ..")
+		kaslr := btrace.NewKaslr(kallsyms.Stext(), textAddr)
+		addr2line, err = btrace.NewAddr2Line(vmlinux, kaslr, kallsyms.SysBPF())
 		assert.NoErr(err, "Failed to create addr2line: %v")
 	}
 
@@ -89,30 +89,30 @@ func main() {
 	assert.NoErr(err, "Failed to create capstone engine: %v")
 	defer engine.Close()
 
-	bpflbr.VerboseLog("Disassembling bpf progs ..")
-	bpfProgs, err := bpflbr.NewBPFProgs(progs, false, false)
+	btrace.VerboseLog("Disassembling bpf progs ..")
+	bpfProgs, err := btrace.NewBPFProgs(progs, false, false)
 	assert.NoErr(err, "Failed to get bpf progs: %v")
 	defer bpfProgs.Close()
 
-	kfuncs, err := bpflbr.FindKernelFuncs(flags.Kfuncs(), kallsyms)
+	kfuncs, err := btrace.FindKernelFuncs(flags.Kfuncs(), kallsyms)
 	assert.NoErr(err, "Failed to find kernel functions: %v")
 
 	tracingTargets := bpfProgs.Tracings()
 	assert.True(len(tracingTargets)+len(kfuncs) != 0, "No tracing target")
 
-	bpflbr.VerboseLog("Tracing bpf progs or kernel functions ..")
-	bpfSpec, err := loadLbr()
+	btrace.VerboseLog("Tracing bpf progs or kernel functions ..")
+	bpfSpec, err := loadBtrace()
 	assert.NoErr(err, "Failed to load bpf spec: %v")
-	delete(bpfSpec.Programs, bpflbr.TracingProgName(flags.OtherMode()))
+	delete(bpfSpec.Programs, btrace.TracingProgName(flags.OtherMode()))
 
 	numCPU, err := ebpf.PossibleCPU()
 	assert.NoErr(err, "Failed to get possible cpu: %v")
 
-	lbrsMapSpec := bpfSpec.Maps[".data.lbrs"]
-	lbrsMapSpec.Flags |= unix.BPF_F_MMAPABLE
-	lbrsMapSpec.ValueSize = uint32(unsafe.Sizeof(bpflbr.Event{})) * uint32(numCPU)
-	lbrsMapSpec.Contents[0].Value = make([]byte, lbrsMapSpec.ValueSize)
-	lbrs, err := ebpf.NewMap(lbrsMapSpec)
+	eventsMapSpec := bpfSpec.Maps[".data.events"]
+	eventsMapSpec.Flags |= unix.BPF_F_MMAPABLE
+	eventsMapSpec.ValueSize = uint32(unsafe.Sizeof(btrace.Event{})) * uint32(numCPU)
+	eventsMapSpec.Contents[0].Value = make([]byte, eventsMapSpec.ValueSize)
+	eventsDataMap, err := ebpf.NewMap(eventsMapSpec)
 	assert.NoErr(err, "Failed to create lbrs map: %v")
 
 	funcStacks, err := ebpf.NewMap(bpfSpec.Maps["func_stacks"])
@@ -130,10 +130,10 @@ func main() {
 	defer events.Close()
 
 	reusedMaps := map[string]*ebpf.Map{
-		"events":      events,
-		".data.lbrs":  lbrs,
-		".data.ready": readyDataMap,
-		"func_stacks": funcStacks,
+		"events":       events,
+		".data.events": eventsDataMap,
+		".data.ready":  readyDataMap,
+		"func_stacks":  funcStacks,
 	}
 
 	if len(kfuncs) != 0 && len(progs) == 0 {
@@ -141,10 +141,10 @@ func main() {
 	}
 
 	if len(kfuncs) > 20 {
-		log.Printf("bpflbr is tracing %d kernel functions, this may take a while", len(kfuncs))
+		log.Printf("btrace is tracing %d kernel functions, this may take a while", len(kfuncs))
 	}
 
-	tracings, err := bpflbr.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets, kfuncs)
+	tracings, err := btrace.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets, kfuncs)
 	assert.NoVerifierErr(err, "Failed to trace: %v")
 	defer tracings.Close()
 	assert.True(tracings.HaveTracing(), "No tracing target")
@@ -152,7 +152,7 @@ func main() {
 	err = bpfProgs.AddProgs(tracings.Progs(), true)
 	assert.NoErr(err, "Failed to add bpf progs: %v")
 
-	kallsyms, err = bpflbr.NewKallsyms()
+	kallsyms, err = btrace.NewKallsyms()
 	assert.NoErr(err, "Failed to reread /proc/kallsyms: %v")
 
 	reader, err := ringbuf.NewReader(events)
@@ -171,8 +171,8 @@ func main() {
 	assert.NoErr(err, "Failed to update ready data map: %v")
 	defer readyDataMap.Put(uint32(0), uint32(0))
 
-	log.Print("bpflbr is running..")
-	defer log.Print("bpflbr is exiting..")
+	log.Print("btrace is running..")
+	defer log.Print("btrace is exiting..")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -186,11 +186,11 @@ func main() {
 	})
 
 	errg.Go(func() error {
-		return bpflbr.Run(reader, bpfProgs, addr2line, kallsyms, kfuncs, funcStacks, w)
+		return btrace.Run(reader, bpfProgs, addr2line, kallsyms, kfuncs, funcStacks, w)
 	})
 
 	err = errg.Wait()
-	if err == bpflbr.ErrFinished {
+	if err == btrace.ErrFinished {
 		return
 	}
 	assert.NoErr(err, "Failed: %v")

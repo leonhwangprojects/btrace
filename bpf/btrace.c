@@ -6,29 +6,29 @@
 
 __u32 ready SEC(".data.ready") = 0;
 
-struct lbr_fn_arg_flags {
+struct btrace_fn_arg_flags {
     bool is_number_ptr;
     bool is_str;
 };
 
 #define MAX_FN_ARGS 6
-struct lbr_fn_args {
-    struct lbr_fn_arg_flags args[MAX_FN_ARGS];
+struct btrace_fn_args {
+    struct btrace_fn_arg_flags args[MAX_FN_ARGS];
     __u32 nr_fn_args;
 } __attribute__((packed));
 
-struct lbr_config {
-    __u32 suppress_lbr:1;
+struct btrace_config {
+    __u32 output_lbr:1;
     __u32 output_stack:1;
     __u32 is_ret_str:1;
     __u32 pad:29;
     __u32 pid;
 
-    struct lbr_fn_args fn_args;
+    struct btrace_fn_args fn_args;
 } __attribute__((packed));
 
-volatile const struct lbr_config lbr_config = {};
-#define cfg (&lbr_config)
+volatile const struct btrace_config btrace_config = {};
+#define cfg (&btrace_config)
 
 #define MAX_STACK_DEPTH 50
 struct {
@@ -38,13 +38,13 @@ struct {
 	__uint(value_size, MAX_STACK_DEPTH * sizeof(u64));
 } func_stacks SEC(".maps");
 
-struct lbr_fn_arg_data {
+struct btrace_fn_arg_data {
     __u64 raw_data;
     __u64 ptr_data;
 };
 
-struct lbr_fn_data {
-    struct lbr_fn_arg_data args[MAX_FN_ARGS];
+struct btrace_fn_data {
+    struct btrace_fn_arg_data args[MAX_FN_ARGS];
     __u8 arg[32];
     __u8 ret[32];
 };
@@ -64,10 +64,10 @@ struct event {
     __u32 pid;
     __u8 comm[16];
     __s64 func_stack_id;
-    struct lbr_fn_data fn_data;
+    struct btrace_fn_data fn_data;
 } __attribute__((packed));
 
-struct event lbr_events[1] SEC(".data.lbrs");
+struct event btrace_events[1] SEC(".data.events");
 
 static __always_inline void
 output_fn_args(struct event *event, void *ctx)
@@ -93,7 +93,7 @@ output_fn_args(struct event *event, void *ctx)
 }
 
 static __always_inline int
-emit_lbr_event(void *ctx)
+emit_btrace_event(void *ctx)
 {
     struct event *event;
     __u64 retval;
@@ -103,9 +103,9 @@ emit_lbr_event(void *ctx)
         return BPF_OK;
 
     cpu = bpf_get_smp_processor_id();
-    event = &lbr_events[cpu];
+    event = &btrace_events[cpu];
 
-    if (!cfg->suppress_lbr)
+    if (cfg->output_lbr)
         event->nr_bytes = bpf_get_branch_snapshot(event->lbr, sizeof(event->lbr), 0); /* required 5.16 kernel. */
 
     /* Other filters must be after bpf_get_branch_snapshot() to avoid polluting
@@ -136,13 +136,13 @@ emit_lbr_event(void *ctx)
 SEC("fexit")
 int BPF_PROG(fexit_fn)
 {
-    return emit_lbr_event(ctx);
+    return emit_btrace_event(ctx);
 }
 
 SEC("fentry")
 int BPF_PROG(fentry_fn)
 {
-    return emit_lbr_event(ctx);
+    return emit_btrace_event(ctx);
 }
 
 char __license[] SEC("license") = "GPL";

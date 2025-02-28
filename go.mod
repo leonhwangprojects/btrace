@@ -1,4 +1,4 @@
-module github.com/Asphaltt/bpflbr
+module github.com/leonhwangprojects/btrace
 
 go 1.23.0
 

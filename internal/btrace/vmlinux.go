@@ -1,7 +1,7 @@
 // Copyright 2024 Leon Hwang.
 // SPDX-License-Identifier: Apache-2.0
 
-package bpflbr
+package btrace
 
 import (
 	"debug/elf"
@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Asphaltt/bpflbr/internal/strx"
+	"github.com/leonhwangprojects/btrace/internal/strx"
 	"golang.org/x/sys/unix"
 )
 

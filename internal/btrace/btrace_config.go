@@ -1,34 +1,34 @@
 // Copyright 2024 Leon Hwang.
 // SPDX-License-Identifier: Apache-2.0
 
-package bpflbr
+package btrace
 
 const (
-	lbrConfigFlagSuppressLbrIdx = 0 + iota
+	lbrConfigFlagOutputLbrIdx = 0 + iota
 	lbrConfigFlagOutputStackIdx
 	lbrConfigFlagIsRetStrIdx
 )
 
-type LbrConfig struct {
+type BtraceConfig struct {
 	Flags     uint32
 	FilterPid uint32
 	FnArgs    [MAX_BPF_FUNC_ARGS]FuncParamFlags
 	FnArgsNr  uint32
 }
 
-func (cfg *LbrConfig) SetSuppressLbr(v bool) {
+func (cfg *BtraceConfig) SetOutputLbr(v bool) {
 	if v {
-		cfg.Flags |= 1 << lbrConfigFlagSuppressLbrIdx
+		cfg.Flags |= 1 << lbrConfigFlagOutputLbrIdx
 	}
 }
 
-func (cfg *LbrConfig) SetOutputStack(v bool) {
+func (cfg *BtraceConfig) SetOutputStack(v bool) {
 	if v {
 		cfg.Flags |= 1 << lbrConfigFlagOutputStackIdx
 	}
 }
 
-func (cfg *LbrConfig) SetIsRetStr(v bool) {
+func (cfg *BtraceConfig) SetIsRetStr(v bool) {
 	if v {
 		cfg.Flags |= 1 << lbrConfigFlagIsRetStrIdx
 	}

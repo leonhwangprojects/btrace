@@ -26,6 +26,6 @@ go.work
 # Editors
 .vscode/
 
-/bpflbr
+/btrace
 
 /bin/*

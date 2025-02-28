@@ -1,7 +1,7 @@
 // Copyright 2024 Leon Hwang.
 // SPDX-License-Identifier: Apache-2.0
 
-package bpflbr
+package btrace
 
 import (
 	"errors"
@@ -16,8 +16,8 @@ import (
 	"github.com/fatih/color"
 	"golang.org/x/sys/unix"
 
-	"github.com/Asphaltt/bpflbr/internal/btfx"
-	"github.com/Asphaltt/bpflbr/internal/strx"
+	"github.com/leonhwangprojects/btrace/internal/btfx"
+	"github.com/leonhwangprojects/btrace/internal/strx"
 )
 
 const (
@@ -30,7 +30,7 @@ type LbrEntry struct {
 	Flags uint64
 }
 
-type LbrFnData struct {
+type BtraceFnData struct {
 	Args [MAX_BPF_FUNC_ARGS][2]uint64 // raw data + pointed data
 	Str  [32]byte
 	Ret  [32]byte
@@ -45,7 +45,7 @@ type Event struct {
 	Pid     uint32
 	Comm    [16]byte
 	StackID int64
-	Func    LbrFnData
+	Func    BtraceFnData
 }
 
 type FuncStack struct {
@@ -58,7 +58,7 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 
 	printRetval := mode == TracingModeExit
 	colorOutput := !noColorOutput
-	useLbr := !suppressLbr
+	useLbr := outputLbr
 
 	funcParamColors := []*color.Color{
 		color.RGB(0x9d, 0x9d, 0x9d),
