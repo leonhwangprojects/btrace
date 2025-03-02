@@ -27,5 +27,6 @@ go.work
 .vscode/
 
 /btrace
+/bpf/headers/vmlinux.h
 
 /bin/*

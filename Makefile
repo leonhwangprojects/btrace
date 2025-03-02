@@ -1,6 +1,7 @@
 # Copyright 2024 Leon Hwang.
 # SPDX-License-Identifier: Apache-2.0
 
+CMD_BPFTOOL ?= bpftool
 CMD_CD ?= cd
 CMD_CP ?= cp
 CMD_CHECKSUM ?= sha256sum
@@ -26,6 +27,8 @@ RELEASE_NOTES ?= release_notes.txt
 
 LIBCAPSTONE_OBJ := lib/capstone/build/libcapstone.a
 
+VMLINUX_OBJ := $(CURDIR)/bpf/headers/vmlinux.h
+
 .DEFAULT_GOAL := $(BTRACE_OBJ)
 
 # Build libcapstone for static linking
@@ -34,7 +37,10 @@ $(LIBCAPSTONE_OBJ):
 		cmake -B build -DCMAKE_BUILD_TYPE=Release -DCAPSTONE_ARCHITECTURE_DEFAULT=1 -DCAPSTONE_BUILD_CSTOOL=0 && \
 		cmake --build build
 
-$(BPF_OBJ): $(BPF_SRC)
+$(VMLINUX_OBJ):
+	$(CMD_BPFTOOL) btf dump file /sys/kernel/btf/vmlinux format c > $(VMLINUX_OBJ)
+
+$(BPF_OBJ): $(BPF_SRC) $(VMLINUX_OBJ)
 	$(GOGEN)
 
 $(BTRACE_OBJ): $(BPF_OBJ) $(BTRACE_SRC) $(LIBCAPSTONE_OBJ)
