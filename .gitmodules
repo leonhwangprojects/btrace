@@ -1,3 +1,6 @@
 [submodule "lib/capstone"]
 	path = lib/capstone
 	url = https://github.com/capstone-engine/capstone.git
+[submodule "lib/libbpf"]
+	path = lib/libbpf
+	url = https://github.com/libbpf/libbpf.git

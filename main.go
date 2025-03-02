@@ -24,8 +24,8 @@ import (
 	"github.com/leonhwangprojects/btrace/internal/btrace"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang btrace ./bpf/btrace.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -Wall
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang feat ./bpf/feature.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -Wall
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang btrace ./bpf/btrace.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -I./lib/libbpf/src -Wall
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang feat ./bpf/feature.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -I./lib/libbpf/src -Wall
 
 func main() {
 	flags, err := btrace.ParseFlags()
