@@ -11,7 +11,8 @@ CMD_TAR ?= tar
 DIR_BIN := ./bin
 
 GOBUILD := go build -v -trimpath
-GOBUILD_CGO_LDFLAGS := CGO_LDFLAGS='-O2 -g -lcapstone -static'
+GOBUILD_CGO_CFLAGS := CGO_CFLAGS='-O2 -I$(CURDIR)/lib/capstone/include'
+GOBUILD_CGO_LDFLAGS := CGO_LDFLAGS='-O2 -g -L$(CURDIR)/lib/capstone/build -lcapstone -static'
 
 GOGEN := go generate
 
@@ -23,12 +24,20 @@ BTRACE_SRC := $(shell find internal -type f -name '*.go') main.go
 BTRACE_CSM := $(BTRACE_OBJ).sha256sum
 RELEASE_NOTES ?= release_notes.txt
 
+LIBCAPSTONE_OBJ := lib/capstone/build/libcapstone.a
+
 .DEFAULT_GOAL := $(BTRACE_OBJ)
+
+# Build libcapstone for static linking
+$(LIBCAPSTONE_OBJ):
+	cd lib/capstone && \
+		cmake -B build -DCMAKE_BUILD_TYPE=Release -DCAPSTONE_ARCHITECTURE_DEFAULT=1 -DCAPSTONE_BUILD_CSTOOL=0 && \
+		cmake --build build
 
 $(BPF_OBJ): $(BPF_SRC)
 	$(GOGEN)
 
-$(BTRACE_OBJ): $(BPF_OBJ) $(BTRACE_SRC)
+$(BTRACE_OBJ): $(BPF_OBJ) $(BTRACE_SRC) $(LIBCAPSTONE_OBJ)
 	$(GOBUILD_CGO_LDFLAGS) $(GOBUILD)
 
 .PHONY: local_release

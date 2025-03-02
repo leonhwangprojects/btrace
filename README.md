@@ -22,13 +22,9 @@ The colorful output of `./btrace -v -k ip_rcv --output-lbr`:
 
 This is a function call stack from callers to callees based on LBR records provided by `bpf_get_branch_snapshot()`, [bpf: Introduce helper bpf_get_branch_snapshot](https://github.com/torvalds/linux/commit/856c02dbce4f).
 
-## Dependencies
-
-- *libcapstone-dev*: for disassembling machine native instructions.
-
 ## Build
 
-With *libcapstone-dev*, build `btrace` by running:
+Build `btrace` by running:
 
 ```bash
 make
