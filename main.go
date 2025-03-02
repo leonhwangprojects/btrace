@@ -12,9 +12,7 @@ import (
 	"os/signal"
 	"slices"
 	"syscall"
-	"unsafe"
 
-	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/knightsc/gapstone"
 	"golang.org/x/sync/errgroup"
@@ -110,40 +108,8 @@ func main() {
 	assert.NoErr(err, "Failed to load bpf spec: %v")
 	delete(bpfSpec.Programs, btrace.TracingProgName(flags.OtherMode()))
 
-	numCPU, err := ebpf.PossibleCPU()
-	assert.NoErr(err, "Failed to get possible cpu: %v")
-
-	eventsMapSpec := bpfSpec.Maps[".data.events"]
-	eventsMapSpec.Flags |= unix.BPF_F_MMAPABLE
-	eventsMapSpec.ValueSize = uint32(unsafe.Sizeof(btrace.Event{})) * uint32(numCPU)
-	eventsMapSpec.Contents[0].Value = make([]byte, eventsMapSpec.ValueSize)
-	eventsDataMap, err := ebpf.NewMap(eventsMapSpec)
-	assert.NoErr(err, "Failed to create lbrs map: %v")
-
-	funcStacks, err := ebpf.NewMap(bpfSpec.Maps["func_stacks"])
-	assert.NoErr(err, "Failed to create func_stacks map: %v")
-	defer funcStacks.Close()
-
-	readyDataMapSpec := bpfSpec.Maps[".data.ready"]
-	readyDataMapSpec.Flags |= unix.BPF_F_MMAPABLE
-	readyDataMap, err := ebpf.NewMap(readyDataMapSpec)
-	assert.NoErr(err, "Failed to create ready data map: %v")
-	defer readyDataMap.Close()
-
-	events, err := ebpf.NewMap(bpfSpec.Maps["events"])
-	assert.NoErr(err, "Failed to create events map: %v")
-	defer events.Close()
-
-	reusedMaps := map[string]*ebpf.Map{
-		"events":       events,
-		".data.events": eventsDataMap,
-		".data.ready":  readyDataMap,
-		"func_stacks":  funcStacks,
-	}
-
-	if len(kfuncs) != 0 && len(progs) == 0 {
-		tracingTargets = tracingTargets[:0]
-	}
+	reusedMaps := btrace.PrepareBPFMaps(bpfSpec)
+	defer btrace.CloseBPFMaps(reusedMaps)
 
 	if len(kfuncs) > 20 {
 		log.Printf("btrace is tracing %d kernel functions, this may take a while", len(kfuncs))
@@ -160,7 +126,7 @@ func main() {
 	kallsyms, err = btrace.NewKallsyms()
 	assert.NoErr(err, "Failed to reread /proc/kallsyms: %v")
 
-	reader, err := ringbuf.NewReader(events)
+	reader, err := ringbuf.NewReader(reusedMaps["btrace_events"])
 	assert.NoErr(err, "Failed to create ringbuf reader: %v")
 	defer reader.Close()
 
@@ -172,9 +138,10 @@ func main() {
 		w = f
 	}
 
-	err = readyDataMap.Put(uint32(0), uint32(1))
+	readyData := reusedMaps[".data.ready"]
+	err = readyData.Put(uint32(0), uint32(1))
 	assert.NoErr(err, "Failed to update ready data map: %v")
-	defer readyDataMap.Put(uint32(0), uint32(0))
+	defer readyData.Put(uint32(0), uint32(0))
 
 	log.Print("btrace is running..")
 	defer log.Print("btrace is exiting..")
@@ -191,7 +158,7 @@ func main() {
 	})
 
 	errg.Go(func() error {
-		return btrace.Run(reader, bpfProgs, addr2line, kallsyms, kfuncs, funcStacks, w)
+		return btrace.Run(reader, bpfProgs, addr2line, kallsyms, kfuncs, reusedMaps, w)
 	})
 
 	err = errg.Wait()

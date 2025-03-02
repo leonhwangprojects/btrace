@@ -14,7 +14,6 @@ import (
 	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/fatih/color"
-	"golang.org/x/sys/unix"
 
 	"github.com/leonhwangprojects/btrace/internal/btfx"
 	"github.com/leonhwangprojects/btrace/internal/strx"
@@ -30,31 +29,57 @@ type LbrEntry struct {
 	Flags uint64
 }
 
-type BtraceFnData struct {
+type LbrData struct {
+	Entries [32]LbrEntry
+	NrBytes int64
+}
+
+type FnData struct {
 	Args [MAX_BPF_FUNC_ARGS][2]uint64 // raw data + pointed data
-	Str  [32]byte
-	Ret  [32]byte
+}
+
+type StrData struct {
+	Arg [32]byte
+	Ret [32]byte
+}
+
+func (s *StrData) arg() string {
+	return strx.NullTerminated(s.Arg[:])
+}
+
+func (s *StrData) ret() string {
+	return strx.NullTerminated(s.Ret[:])
 }
 
 type Event struct {
-	Entries [32]LbrEntry
-	NrBytes int64
+	SessID  uint64
 	Retval  int64
 	FuncIP  uintptr
 	CPU     uint32
 	Pid     uint32
 	Comm    [16]byte
 	StackID int64
-	Func    BtraceFnData
+	Func    FnData
 }
 
 type FuncStack struct {
 	IPs [MAX_STACK_DEPTH]uint64
 }
 
-func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *Kallsyms, kfuncs KFuncs, funcStacks *ebpf.Map, w io.Writer) error {
+func ptr2bytes(p unsafe.Pointer, size int) []byte {
+	return unsafe.Slice((*byte)(p), size)
+}
+
+func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *Kallsyms, kfuncs KFuncs, maps map[string]*ebpf.Map, w io.Writer) error {
 	lbrStack := newLBRStack()
 	funcStack := make([]string, 0, MAX_STACK_DEPTH)
+
+	stacks := maps["btrace_stacks"]
+	lbrs := maps["btrace_lbrs"]
+	strs := maps["btrace_strs"]
+
+	var lbrData LbrData
+	var strData StrData
 
 	printRetval := mode == TracingModeExit
 	colorOutput := !noColorOutput
@@ -95,20 +120,23 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 		}
 
 		event := (*Event)(unsafe.Pointer(&record.RawSample[0]))
-
-		if event.NrBytes < 0 && event.NrBytes == -int64(unix.ENOENT) && useLbr {
-			return fmt.Errorf("LBR not supported")
-		}
-
 		if outputFuncStack && event.StackID >= 0 {
-			funcStack, err = getFuncStack(event, progs, addr2line, ksyms, funcStacks, funcStack)
+			funcStack, err = getFuncStack(event, progs, addr2line, ksyms, stacks, funcStack)
 			if err != nil {
 				return err
 			}
 		}
 
-		hasLbrEntries := useLbr && event.NrBytes > 0 && event.Entries[0] != (LbrEntry{})
-		hasLbrEntries = hasLbrEntries && getLbrStack(event, progs, addr2line, ksyms, lbrStack)
+		if useLbr {
+			b := ptr2bytes(unsafe.Pointer(&lbrData), int(unsafe.Sizeof(lbrData)))
+			err := lbrs.LookupAndDelete(event.SessID, b)
+			if err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
+				return fmt.Errorf("failed to lookup lbr data: %w", err)
+			}
+		}
+
+		hasLbrEntries := useLbr && lbrData.NrBytes > 0 && lbrData.Entries[0] != (LbrEntry{})
+		hasLbrEntries = hasLbrEntries && getLbrStack(event.FuncIP, &lbrData, progs, addr2line, ksyms, lbrStack)
 
 		var targetName string
 		var funcProto *btf.Func
@@ -133,6 +161,21 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			}
 		}
 
+		useStrData := false
+		for _, prm := range funcParams {
+			useStrData = useStrData || prm.IsStr
+		}
+		if !useStrData && funcProto != nil && btfx.IsStr(funcProto.Type.(*btf.FuncProto).Return) {
+			useStrData = true
+		}
+		if useStrData {
+			b := ptr2bytes(unsafe.Pointer(&strData), int(unsafe.Sizeof(strData)))
+			err := strs.LookupAndDelete(event.SessID, b)
+			if err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
+				return fmt.Errorf("failed to lookup str data: %w", err)
+			}
+		}
+
 		if colorOutput {
 			targetName = color.New(color.FgYellow, color.Bold).Sprint(targetName)
 		}
@@ -147,9 +190,15 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 		if funcProto != nil {
 			params := funcProto.Type.(*btf.FuncProto).Params
 			lastIdx := len(params) - 1
-			s := strx.NullTerminated(event.Func.Str[:])
+			s := strData.arg()
+			strUsed := false
 			for i, fnParam := range funcParams {
 				arg := event.Func.Args[i]
+
+				if strUsed {
+					s = ""
+				}
+				strUsed = strUsed || fnParam.IsStr
 
 				fp := btfx.ReprFuncParam(&params[i], i, fnParam.IsStr, fnParam.IsNumberPtr, arg[0], arg[1], s, findSymbol)
 				if colorOutput {
@@ -171,7 +220,7 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			retval := fmt.Sprintf("%d/%#x", event.Retval, uint64(event.Retval))
 			if funcProto != nil {
 				rettyp := funcProto.Type.(*btf.FuncProto).Return
-				retval = btfx.ReprFuncReturn(rettyp, event.Retval, strx.NullTerminated(event.Func.Ret[:]), findSymbol)
+				retval = btfx.ReprFuncReturn(rettyp, event.Retval, strData.ret(), findSymbol)
 			}
 			if colorOutput {
 				color.New(color.FgGreen).Fprintf(&sb, " retval")
@@ -211,12 +260,11 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 	return ErrFinished
 }
 
-func getLbrStack(event *Event, progs *bpfProgs, addr2line *Addr2Line, ksyms *Kallsyms, stack *lbrStack) bool {
-	funcIP := event.FuncIP
+func getLbrStack(funcIP uintptr, lbrData *LbrData, progs *bpfProgs, addr2line *Addr2Line, ksyms *Kallsyms, stack *lbrStack) bool {
 	progInfo, isProg := progs.funcs[funcIP]
 
-	nrEntries := event.NrBytes / int64(8*3)
-	entries := event.Entries[:nrEntries]
+	nrEntries := lbrData.NrBytes / int64(8*3)
+	entries := lbrData.Entries[:nrEntries]
 	if !verbose {
 		if !isProg {
 			for i := range entries {
