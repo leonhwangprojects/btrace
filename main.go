@@ -36,6 +36,11 @@ func main() {
 		return
 	}
 
+	if flags.ShowFuncProto() {
+		btrace.ShowFuncProto(flags)
+		return
+	}
+
 	mode := flags.Mode()
 	assert.True(slices.Contains([]string{btrace.TracingModeEntry, btrace.TracingModeExit}, mode),
 		fmt.Sprintf("Mode (%s) must be exit or entry", mode))

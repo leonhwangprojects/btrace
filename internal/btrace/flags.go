@@ -44,6 +44,8 @@ type Flags struct {
 
 	disasm      bool
 	disasmBytes uint
+
+	showFuncProto bool
 }
 
 func ParseFlags() (*Flags, error) {
@@ -64,6 +66,7 @@ func ParseFlags() (*Flags, error) {
 	f.Uint32Var(&filterPid, "filter-pid", 0, "filter pid for tracing")
 	f.StringVar(&filterArg, "filter-arg", "", "filter function's argument with C expression, e.g. 'prog->type == BPF_PROG_TYPE_TRACING'")
 	f.UintVar(&limitEvents, "limit-events", 0, "limited number events to output, 0 to output all events")
+	f.BoolVar(&flags.showFuncProto, "show-func-proto", false, "show function prototype of -p,-k")
 
 	err := f.Parse(os.Args)
 
@@ -107,4 +110,8 @@ func (f *Flags) OtherMode() string {
 	}
 
 	return TracingModeExit
+}
+
+func (f *Flags) ShowFuncProto() bool {
+	return f.showFuncProto
 }
