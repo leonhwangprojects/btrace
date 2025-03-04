@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/cilium/ebpf/btf"
-	"github.com/gobwas/glob"
+
 	"github.com/leonhwangprojects/btrace/internal/btfx"
 )
 
@@ -35,36 +35,14 @@ func (k KFunc) Name() string {
 
 type KFuncs map[uintptr]KFunc
 
-func str2glob(funcs []string) ([]glob.Glob, error) {
-	globs := make([]glob.Glob, 0, len(funcs))
-	for _, fn := range funcs {
-		g, err := glob.Compile(fn)
-		if err != nil {
-			return nil, fmt.Errorf("failed to compile glob from %s: %w", fn, err)
-		}
-
-		globs = append(globs, g)
-	}
-	return globs, nil
-}
-
-func isGlobFunc(fn string, globs []glob.Glob) bool {
-	for _, g := range globs {
-		if g.Match(fn) {
-			return true
-		}
-	}
-	return false
-}
-
 func FindKernelFuncs(funcs []string, ksyms *Kallsyms) (KFuncs, error) {
 	if len(funcs) == 0 {
 		return KFuncs{}, nil
 	}
 
-	globs, err := str2glob(funcs)
+	matches, err := kfuncFlags2matches(funcs)
 	if err != nil {
-		return nil, err
+		return KFuncs{}, err
 	}
 
 	kfuncs := make(KFuncs, len(funcs))
@@ -72,23 +50,30 @@ func FindKernelFuncs(funcs []string, ksyms *Kallsyms) (KFuncs, error) {
 	iterBtfSpec := func(spec *btf.Spec) {
 		iter := spec.Iterate()
 		for iter.Next() {
-			if fn, ok := iter.Type.(*btf.Func); ok && isGlobFunc(fn.Name, globs) {
-				ksym, ok := ksyms.n2s[fn.Name]
-				if !ok {
-					VerboseLog("Failed to find ksym for %s", fn.Name)
-					continue
-				}
+			fn, ok := iter.Type.(*btf.Func)
+			if !ok {
+				continue
+			}
 
-				funcProto := fn.Type.(*btf.FuncProto)
-				if len(funcProto.Params) <= MAX_BPF_FUNC_ARGS {
-					kf := KFunc{Ksym: ksym, Func: fn}
-					kf.Prms = getFuncParams(fn)
-					kf.IsRetStr = btfx.IsStr(funcProto.Return)
-					kfuncs[uintptr(ksym.addr)] = kf
-				} else if verbose {
-					log.Printf("Skip function %s with %d args because of limit %d args\n",
-						fn.Name, len(funcProto.Params), MAX_BPF_FUNC_ARGS)
-				}
+			funcProto := fn.Type.(*btf.FuncProto)
+			if !matchKfunc(fn.Name, funcProto, matches) {
+				continue
+			}
+
+			ksym, ok := ksyms.n2s[fn.Name]
+			if !ok {
+				VerboseLog("Failed to find ksym for %s", fn.Name)
+				continue
+			}
+
+			if len(funcProto.Params) <= MAX_BPF_FUNC_ARGS {
+				kf := KFunc{Ksym: ksym, Func: fn}
+				kf.Prms = getFuncParams(fn)
+				kf.IsRetStr = btfx.IsStr(funcProto.Return)
+				kfuncs[uintptr(ksym.addr)] = kf
+			} else if verbose {
+				log.Printf("Skip function %s with %d args because of limit %d args\n",
+					fn.Name, len(funcProto.Params), MAX_BPF_FUNC_ARGS)
 			}
 		}
 	}

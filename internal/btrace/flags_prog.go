@@ -10,6 +10,14 @@ import (
 	"strings"
 )
 
+const (
+	progFlagDescriptorID     = "id"
+	progFlagDescriptorPinned = "pinned"
+	progFlagDescriptorTag    = "tag"
+	progFlagDescriptorName   = "name"
+	progFlagDescriptorPid    = "pid"
+)
+
 type ProgFlag struct {
 	progID uint32
 	pinned string
