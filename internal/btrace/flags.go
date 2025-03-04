@@ -10,14 +10,6 @@ import (
 )
 
 const (
-	progFlagDescriptorID     = "id"
-	progFlagDescriptorPinned = "pinned"
-	progFlagDescriptorTag    = "tag"
-	progFlagDescriptorName   = "name"
-	progFlagDescriptorPid    = "pid"
-)
-
-const (
 	TracingModeEntry = "entry"
 	TracingModeExit  = "exit"
 )
