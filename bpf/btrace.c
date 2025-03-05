@@ -5,7 +5,8 @@
 #include "bpf_tracing.h"
 #include "bpf_map_helpers.h"
 
-#define BTRACE_MAX_ENTRIES 65536
+#include "btrace_common.h"
+#include "btrace_pkt.h"
 
 __u32 ready SEC(".data.ready") = 0;
 
@@ -23,8 +24,9 @@ struct btrace_fn_args {
 struct btrace_config {
     __u32 output_lbr:1;
     __u32 output_stack:1;
+    __u32 output_pkt:1;
     __u32 is_ret_str:1;
-    __u32 pad:29;
+    __u32 pad:28;
     __u32 pid;
 
     struct btrace_fn_args fn_args;
@@ -172,6 +174,7 @@ emit_btrace_event(void *ctx)
 {
     struct btrace_lbr_data *lbr;
     struct btrace_str_data *str;
+    struct btrace_pkt_data *pkt;
     struct event *evt;
     __u64 retval;
     __u32 cpu;
@@ -181,6 +184,7 @@ emit_btrace_event(void *ctx)
 
     cpu = bpf_get_smp_processor_id();
     lbr = &btrace_lbr_buff[cpu];
+    pkt = &btrace_pkt_buff[cpu];
     str = &btrace_str_buff[cpu];
     evt = &btrace_evt_buff[cpu];
 
@@ -209,6 +213,8 @@ emit_btrace_event(void *ctx)
     output_fn_data(evt, ctx, (void *) retval, str);
     if (cfg->output_lbr)
         output_lbr_data(evt, lbr);
+    if (cfg->output_pkt)
+        output_pkt_tuple(ctx, pkt, evt->session_id);
 
     bpf_ringbuf_output(&btrace_events, evt, sizeof(*evt), 0);
 

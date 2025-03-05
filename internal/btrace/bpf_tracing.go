@@ -31,6 +31,7 @@ func setBtraceConfig(spec *ebpf.CollectionSpec, args []FuncParamFlags, isRetStr 
 	var cfg BtraceConfig
 	cfg.SetOutputLbr(outputLbr)
 	cfg.SetOutputStack(outputFuncStack)
+	cfg.SetOutputPktTuple(outputPktTuple)
 	cfg.SetIsRetStr(isRetStr)
 	cfg.FilterPid = filterPid
 	cfg.FnArgsNr = uint32(len(args))
