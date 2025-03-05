@@ -265,6 +265,37 @@ func ReprValue(t btf.Type, val uint64, find findSymbol) string {
 	return sb.String()
 }
 
+func ReprParam(name string, t btf.Type, data, data2 uint64, s string, f findSymbol) string {
+	var sb strings.Builder
+
+	fmt.Fprintf(&sb, "(%v)", Repr(t))
+
+	size, err := btf.Sizeof(t)
+	if err != nil {
+		fmt.Fprintf(&sb, "%s=..ERR..", name)
+		return sb.String()
+	}
+
+	fmt.Fprint(&sb, name, "=")
+
+	isStr := IsStr(t)
+	isNumPtr := IsNumberPointer(t)
+	if size == 8 && (isStr || isNumPtr) {
+		if isStr {
+			fmt.Fprintf(&sb, "\"%s\"", s)
+		} else if data != 0 {
+			t = mybtf.UnderlyingType(t).(*btf.Pointer).Target
+			fmt.Fprintf(&sb, "%#x(%s)", data, ReprValue(t, data2, f))
+		} else {
+			fmt.Fprintf(&sb, "%#x", data)
+		}
+	} else {
+		fmt.Fprint(&sb, ReprValue(t, data, f))
+	}
+
+	return sb.String()
+}
+
 func ReprFuncParam(param *btf.FuncParam, i int, isStr, isNumberPtr bool, data, data2 uint64, s string, f findSymbol) string {
 	var sb strings.Builder
 

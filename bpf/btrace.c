@@ -7,6 +7,7 @@
 
 #include "btrace_common.h"
 #include "btrace_pkt.h"
+#include "btrace_arg.h"
 
 __u32 ready SEC(".data.ready") = 0;
 
@@ -25,8 +26,9 @@ struct btrace_config {
     __u32 output_lbr:1;
     __u32 output_stack:1;
     __u32 output_pkt:1;
+    __u32 output_arg:1;
     __u32 is_ret_str:1;
-    __u32 pad:28;
+    __u32 pad:27;
     __u32 pid;
 
     struct btrace_fn_args fn_args;
@@ -175,6 +177,7 @@ emit_btrace_event(void *ctx)
     struct btrace_lbr_data *lbr;
     struct btrace_str_data *str;
     struct btrace_pkt_data *pkt;
+    struct btrace_arg_data *arg;
     struct event *evt;
     __u64 retval;
     __u32 cpu;
@@ -185,6 +188,7 @@ emit_btrace_event(void *ctx)
     cpu = bpf_get_smp_processor_id();
     lbr = &btrace_lbr_buff[cpu];
     pkt = &btrace_pkt_buff[cpu];
+    arg = &btrace_arg_buff[cpu];
     str = &btrace_str_buff[cpu];
     evt = &btrace_evt_buff[cpu];
 
@@ -215,6 +219,8 @@ emit_btrace_event(void *ctx)
         output_lbr_data(evt, lbr);
     if (cfg->output_pkt)
         output_pkt_tuple(ctx, pkt, evt->session_id);
+    if (cfg->output_arg)
+        output_arg_data(ctx, arg, evt->session_id);
 
     bpf_ringbuf_output(&btrace_events, evt, sizeof(*evt), 0);
 

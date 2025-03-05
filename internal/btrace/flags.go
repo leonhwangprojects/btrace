@@ -32,6 +32,7 @@ var (
 type Flags struct {
 	progs  []string
 	kfuncs []string
+	args   []string
 
 	outputFile string
 
@@ -57,6 +58,7 @@ func ParseFlags() (*Flags, error) {
 	f.BoolVar(&outputLbr, "output-lbr", false, "output LBR perf event")
 	f.BoolVar(&outputFuncStack, "output-stack", false, "output function call stack")
 	f.BoolVar(&outputPktTuple, "output-packet-tuple", false, "output packet's tuple info if tracee has skb/xdp arg")
+	f.StringSliceVar(&flags.args, "output-arg", nil, "output function argument metadata, e.g. 'skb->hash'")
 	f.Uint32Var(&filterPid, "filter-pid", 0, "filter pid for tracing")
 	f.StringVar(&filterArg, "filter-arg", "", "filter function's argument with C expression, e.g. 'prog->type == BPF_PROG_TYPE_TRACING'")
 	f.UintVar(&limitEvents, "limit-events", 0, "limited number events to output, 0 to output all events")
