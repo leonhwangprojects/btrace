@@ -22,8 +22,9 @@ struct btrace_fn_args {
 struct btrace_config {
     __u32 output_lbr:1;
     __u32 output_stack:1;
+    __u32 output_pkt:1;
     __u32 is_ret_str:1;
-    __u32 pad:29;
+    __u32 pad:28;
     __u32 pid;
 
     struct btrace_fn_args fn_args;

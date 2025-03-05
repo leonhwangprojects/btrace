@@ -6,6 +6,7 @@ package btrace
 const (
 	lbrConfigFlagOutputLbrIdx = 0 + iota
 	lbrConfigFlagOutputStackIdx
+	lbrConfigFlagOutputPktIdx
 	lbrConfigFlagIsRetStrIdx
 )
 
@@ -25,6 +26,12 @@ func (cfg *BtraceConfig) SetOutputLbr(v bool) {
 func (cfg *BtraceConfig) SetOutputStack(v bool) {
 	if v {
 		cfg.Flags |= 1 << lbrConfigFlagOutputStackIdx
+	}
+}
+
+func (cfg *BtraceConfig) SetOutputPktTuple(v bool) {
+	if v {
+		cfg.Flags |= 1 << lbrConfigFlagOutputPktIdx
 	}
 }
 

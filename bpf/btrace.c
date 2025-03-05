@@ -9,6 +9,7 @@
 #include "btrace_lbr.h"
 #include "btrace_arg.h"
 #include "btrace_pkt_filter.h"
+#include "btrace_pkt_output.h"
 
 __u32 ready SEC(".data.ready") = 0;
 
@@ -59,6 +60,7 @@ emit_btrace_event(void *ctx)
 {
     struct btrace_lbr_data *lbr;
     struct btrace_str_data *str;
+    struct btrace_pkt_data *pkt;
     struct event *evt;
     __u64 retval;
     __u32 cpu;
@@ -68,6 +70,7 @@ emit_btrace_event(void *ctx)
 
     cpu = bpf_get_smp_processor_id();
     lbr = &btrace_lbr_buff[cpu];
+    pkt = &btrace_pkt_buff[cpu];
     str = &btrace_str_buff[cpu];
     evt = &btrace_evt_buff[cpu];
 
@@ -97,6 +100,8 @@ emit_btrace_event(void *ctx)
     output_fn_data(evt, ctx, (void *) retval, str);
     if (cfg->output_lbr)
         output_lbr_data(lbr, evt->session_id);
+    if (cfg->output_pkt)
+        output_pkt_tuple(ctx, pkt, evt->session_id);
 
     bpf_ringbuf_output(&btrace_events, evt, sizeof(*evt), 0);
 

@@ -34,6 +34,7 @@ func setBtraceConfig(spec *ebpf.CollectionSpec, args []FuncParamFlags, isRetStr 
 	var cfg BtraceConfig
 	cfg.SetOutputLbr(outputLbr)
 	cfg.SetOutputStack(outputFuncStack)
+	cfg.SetOutputPktTuple(outputPkt)
 	cfg.SetIsRetStr(isRetStr)
 	cfg.FilterPid = filterPid
 	cfg.FnArgsNr = uint32(len(args))
@@ -190,6 +191,33 @@ func (t *bpfTracing) injectPktFilter(prog *ebpf.ProgramSpec, params []btf.FuncPa
 	return nil
 }
 
+func (t *bpfTracing) injectPktOutput(prog *ebpf.ProgramSpec, params []btf.FuncParam) {
+	if !outputPkt {
+		return
+	}
+
+	for i, p := range params {
+		typ := mybtf.UnderlyingType(p.Type)
+		ptr, ok := typ.(*btf.Pointer)
+		if !ok {
+			continue
+		}
+
+		stt, ok := ptr.Target.(*btf.Struct)
+		if !ok {
+			continue
+		}
+
+		switch stt.Name {
+		case "sk_buff", "__sk_buff":
+			pktOutput.outputSkb(prog, i)
+
+		case "xdp_buff", "xdp_md":
+			pktOutput.outputXdp(prog, i)
+		}
+	}
+}
+
 func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, info bpfTracingInfo) error {
 	spec = spec.Copy()
 
@@ -200,6 +228,7 @@ func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]
 	tracingFuncName := TracingProgName(mode)
 	progSpec := spec.Programs[tracingFuncName]
 	params := info.fn.Type.(*btf.FuncProto).Params
+	t.injectPktOutput(progSpec, params)
 	if err := t.injectFnArg(progSpec, params); err != nil {
 		return err
 	}
@@ -258,6 +287,7 @@ func (t *bpfTracing) traceFunc(spec *ebpf.CollectionSpec, reusedMaps map[string]
 	tracingFuncName := TracingProgName(mode)
 	progSpec := spec.Programs[tracingFuncName]
 	params := fn.Func.Type.(*btf.FuncProto).Params
+	t.injectPktOutput(progSpec, params)
 	if err := t.injectFnArg(progSpec, params); err != nil {
 		return err
 	}

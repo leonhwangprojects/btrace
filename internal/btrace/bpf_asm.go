@@ -45,12 +45,24 @@ func injectInsns(prog *ebpf.ProgramSpec, stub string, insns asm.Instructions) {
 		append(insns, prog.Instructions[retIdx+1:]...)...)
 }
 
-func clearSubprog(prog *ebpf.ProgramSpec, stub string) {
+func __clearSubprog(prog *ebpf.ProgramSpec, stub string, isFilter bool) {
 	injectInsns(prog, stub, nil)
 
 	for i := 0; i < len(prog.Instructions); i++ {
 		if ref := prog.Instructions[i].Reference(); ref == stub {
-			prog.Instructions[i] = asm.Mov.Imm(asm.R0, 1)
+			if isFilter {
+				prog.Instructions[i] = asm.Mov.Imm(asm.R0, 1)
+			} else {
+				prog.Instructions[i] = asm.Xor.Reg(asm.R0, asm.R0)
+			}
 		}
 	}
+}
+
+func clearOutputSubprog(prog *ebpf.ProgramSpec, stub string) {
+	__clearSubprog(prog, stub, false)
+}
+
+func clearFilterSubprog(prog *ebpf.ProgramSpec, stub string) {
+	__clearSubprog(prog, stub, true)
 }

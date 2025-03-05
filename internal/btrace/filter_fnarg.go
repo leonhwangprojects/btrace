@@ -10,6 +10,7 @@ import (
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/btf"
 	"github.com/leonhwangprojects/bice"
+
 	"github.com/leonhwangprojects/btrace/internal/strx"
 )
 
@@ -55,7 +56,7 @@ func (arg *funcArgument) compile(idx int, t btf.Type) (asm.Instructions, error) 
 }
 
 func (arg *funcArgument) clear(prog *ebpf.ProgramSpec) {
-	clearSubprog(prog, injectStubFilterArg)
+	clearFilterSubprog(prog, injectStubFilterArg)
 }
 
 func (arg *funcArgument) inject(prog *ebpf.ProgramSpec, idx int, t btf.Type) error {

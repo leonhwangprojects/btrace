@@ -36,6 +36,16 @@ func PrepareBPFMaps(spec *ebpf.CollectionSpec) map[string]*ebpf.Map {
 	strs, err := ebpf.NewMap(spec.Maps["btrace_strs"])
 	assert.NoErr(err, "Failed to create btrace_strs map: %v")
 
+	pktsMapSpec := spec.Maps[".data.pkts"]
+	pktsMapSpec.Flags |= unix.BPF_F_MMAPABLE
+	pktsMapSpec.ValueSize = uint32(unsafe.Sizeof(StrData{})) * uint32(numCPU)
+	pktsMapSpec.Contents[0].Value = make([]byte, pktsMapSpec.ValueSize)
+	pktsData, err := ebpf.NewMap(pktsMapSpec)
+	assert.NoErr(err, "Failed to create pkts map: %v")
+
+	pkts, err := ebpf.NewMap(spec.Maps["btrace_pkts"])
+	assert.NoErr(err, "Failed to create btrace_pkts map: %v")
+
 	stacks, err := ebpf.NewMap(spec.Maps["btrace_stacks"])
 	assert.NoErr(err, "Failed to create btrace_stacks map: %v")
 
@@ -58,9 +68,11 @@ func PrepareBPFMaps(spec *ebpf.CollectionSpec) map[string]*ebpf.Map {
 		"btrace_events": events,
 		"btrace_lbrs":   lbrs,
 		"btrace_strs":   strs,
+		"btrace_pkts":   pkts,
 		".data.events":  evsData,
 		".data.lbrs":    lbrsData,
 		".data.strs":    strsData,
+		".data.pkts":    pktsData,
 		".data.ready":   readyData,
 		"btrace_stacks": stacks,
 	}

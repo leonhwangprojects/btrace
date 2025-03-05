@@ -77,9 +77,11 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 	stacks := maps["btrace_stacks"]
 	lbrs := maps["btrace_lbrs"]
 	strs := maps["btrace_strs"]
+	pkts := maps["btrace_pkts"]
 
 	var lbrData LbrData
 	var strData StrData
+	var pktData PktData
 
 	printRetval := mode == TracingModeExit
 	colorOutput := !noColorOutput
@@ -125,6 +127,17 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			if err != nil {
 				return err
 			}
+		}
+
+		hasPktTuple := false
+		if outputPkt {
+			b := ptr2bytes(unsafe.Pointer(&pktData), int(unsafe.Sizeof(pktData)))
+			err := pkts.LookupAndDelete(event.SessID, b)
+			if err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
+				return fmt.Errorf("failed to lookup pkt data: %w", err)
+			}
+
+			hasPktTuple = !pktData.zero()
 		}
 
 		if useLbr {
@@ -238,6 +251,11 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			fmt.Fprintf(&sb, " cpu=%d process=(%d:%s)", event.CPU, event.Pid, strx.NullTerminated(event.Comm[:]))
 		}
 		fmt.Fprintln(&sb)
+
+		if hasPktTuple {
+			fmt.Fprint(&sb, "Pkt tuple: ")
+			color.New(color.FgGreen).Fprintln(&sb, pktData.repr())
+		}
 
 		if hasLbrEntries {
 			fmt.Fprintln(&sb, "LBR stack:")

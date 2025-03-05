@@ -36,16 +36,6 @@ func preparePacketFilter(expr string) packetFilter {
 	return pf
 }
 
-func (pf *packetFilter) genGetFuncArg(index int, dst asm.Register) asm.Instructions {
-	return asm.Instructions{
-		asm.Mov.Reg(asm.R3, asm.R10),
-		asm.Add.Imm(asm.R3, -8),
-		asm.Mov.Imm(asm.R2, int32(index)),
-		asm.FnGetFuncArg.Call(),
-		asm.LoadMem(dst, asm.R10, -8, asm.DWord),
-	}
-}
-
 func (pf *packetFilter) filterSkb(prog *ebpf.ProgramSpec, index int, t btf.Type) error {
 	if pf.expr == "" {
 		return nil
@@ -75,9 +65,9 @@ func (pf *packetFilter) filterSkb(prog *ebpf.ProgramSpec, index int, t btf.Type)
 	}
 
 	pf.clearSpecializedStubs(prog)
-	clearSubprog(prog, filterXdpFunc)
+	clearFilterSubprog(prog, filterXdpFunc)
 
-	insns := pf.genGetFuncArg(index, asm.R1) // R1 = skb
+	insns := genGetFuncArg(index, asm.R1) // R1 = skb
 	insns = append(insns,
 		asm.Call.Label(filterSkbFunc),
 		asm.Return(),
@@ -105,10 +95,10 @@ func (pf *packetFilter) filterXdp(prog *ebpf.ProgramSpec, index int, t btf.Type)
 	}
 
 	pf.clearSpecializedStubs(prog)
-	clearSubprog(prog, filterSkbFunc)
-	clearSubprog(prog, pcapFilterL3Stub)
+	clearFilterSubprog(prog, filterSkbFunc)
+	clearFilterSubprog(prog, pcapFilterL3Stub)
 
-	insns := pf.genGetFuncArg(index, asm.R1) // R1 = xdp
+	insns := genGetFuncArg(index, asm.R1) // R1 = xdp
 	insns = append(insns,
 		asm.Call.Label(filterXdpFunc),
 		asm.Return(),
@@ -121,15 +111,15 @@ func (pf *packetFilter) filterXdp(prog *ebpf.ProgramSpec, index int, t btf.Type)
 }
 
 func (pf *packetFilter) clearSpecializedStubs(prog *ebpf.ProgramSpec) {
-	clearSubprog(prog, pcapFilterL2StubSpecialized)
-	clearSubprog(prog, pcapFilterL3StubSpecialized)
+	clearFilterSubprog(prog, pcapFilterL2StubSpecialized)
+	clearFilterSubprog(prog, pcapFilterL3StubSpecialized)
 }
 
 func (pf *packetFilter) clear(prog *ebpf.ProgramSpec) {
 	pf.clearSpecializedStubs(prog)
-	clearSubprog(prog, pcapFilterL2Stub)
-	clearSubprog(prog, pcapFilterL3Stub)
-	clearSubprog(prog, filterSkbFunc)
-	clearSubprog(prog, filterXdpFunc)
-	clearSubprog(prog, filterPktFunc)
+	clearFilterSubprog(prog, pcapFilterL2Stub)
+	clearFilterSubprog(prog, pcapFilterL3Stub)
+	clearFilterSubprog(prog, filterSkbFunc)
+	clearFilterSubprog(prog, filterXdpFunc)
+	clearFilterSubprog(prog, filterPktFunc)
 }

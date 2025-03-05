@@ -16,5 +16,9 @@ func TrimSpec(spec *ebpf.CollectionSpec) {
 		if fnArg.expr == "" {
 			fnArg.clear(prog)
 		}
+
+		if !outputPkt {
+			pktOutput.clear(prog)
+		}
 	}
 }
