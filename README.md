@@ -38,7 +38,9 @@ Usage of btrace:
   -d, --disasm                disasm bpf prog or kernel function
   -B, --disasm-bytes uint     disasm bytes of kernel function, 0 to guess it automatically
       --disasm-intel-syntax   use Intel asm syntax for disasm, ATT asm syntax by default
+      --filter-arg string     filter function's argument with C expression, e.g. 'prog->type == BPF_PROG_TYPE_TRACING'
       --filter-pid uint32     filter pid for tracing
+      --filter-pkt string     filter packet with pcap-filter(7) expr if function argument is skb or xdp, e.g. 'icmp and host 1.1.1.1'
   -k, --kfunc strings         filter kernel functions by shell wildcards way
       --kfunc-all-kmods       filter functions in all kernel modules
       --limit-events uint     limited number events to output, 0 to output all events
@@ -47,6 +49,7 @@ Usage of btrace:
       --output-lbr            output LBR perf event
       --output-stack          output function call stack
   -p, --prog strings          bpf prog info for btrace in format PROG[,PROG,..], PROG: PROGID[:<prog function name>], PROGID: <prog ID> or 'i/id:<prog ID>' or 'p/pinned:<pinned file>' or 't/tag:<prog tag>' or 'n/name:<prog full name>' or 'pid:<pid>'; all bpf progs will be traced if '*' is specified
+      --show-func-proto       show function prototype of -p,-k
   -v, --verbose               output verbose log
 ```
 
@@ -114,6 +117,7 @@ The colorful output of `./btrace -v -k ip_rcv --output-stack`:
 - [cilium/ebpf](https://github.com/cilium/ebpf) for interacting with bpf subsystem.
 - [daludaluking/addr2line](https://github.com/daludaluking/addr2line) for translating addresses to file and line number by parsing debug info from vmlinux.
 - [knightsc/gapstone](https://github.com/knightsc/gapstone) for disassembling machine native instructions.
+- [jschwinger233/elibpcap](github.com/jschwinger233/elibpcap) for injecting pcap-filter expressions to bpf stubs.
 
 ## License
 

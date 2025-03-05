@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0 OR Apache-2.0
-/* Copyright 2024 Leon Hwang */
+/* Copyright 2025 Leon Hwang */
 
 #ifndef __BTRACE_LBR_H_
 #define __BTRACE_LBR_H_

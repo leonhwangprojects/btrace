@@ -60,7 +60,6 @@ func (arg *funcArgument) clear(prog *ebpf.ProgramSpec) {
 
 func (arg *funcArgument) inject(prog *ebpf.ProgramSpec, idx int, t btf.Type) error {
 	if arg.expr == "" {
-		arg.clear(prog)
 		return nil
 	}
 

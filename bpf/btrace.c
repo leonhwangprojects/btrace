@@ -8,6 +8,7 @@
 #include "btrace.h"
 #include "btrace_lbr.h"
 #include "btrace_arg.h"
+#include "btrace_pkt_filter.h"
 
 __u32 ready SEC(".data.ready") = 0;
 
@@ -25,6 +26,12 @@ struct {
 } btrace_events SEC(".maps");
 
 struct event btrace_evt_buff[1] SEC(".data.events");
+
+static __always_inline bool
+filter(void *ctx, __u64 session_id)
+{
+    return filter_fnarg(ctx) && filter_pkt(ctx, session_id);
+}
 
 static __always_inline __u64
 get_tracee_caller_fp(void)
@@ -74,10 +81,11 @@ emit_btrace_event(void *ctx)
     evt->pid = bpf_get_current_pid_tgid() >> 32;
     if (cfg->pid && evt->pid != cfg->pid)
         return BPF_OK;
-    if (!filter_fnarg(ctx))
-        return BPF_OK;
 
     evt->session_id = gen_session_id();
+    if (!filter(ctx, evt->session_id))
+        return BPF_OK;
+
     bpf_get_func_ret(ctx, (void *) &retval); /* required 5.17 kernel. */
     evt->func_ret = retval;
     evt->func_ip = bpf_get_func_ip(ctx); /* required 5.17 kernel. */

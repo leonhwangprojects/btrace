@@ -108,6 +108,8 @@ func main() {
 	assert.NoErr(err, "Failed to load bpf spec: %v")
 	delete(bpfSpec.Programs, btrace.TracingProgName(flags.OtherMode()))
 
+	btrace.TrimSpec(bpfSpec)
+
 	reusedMaps := btrace.PrepareBPFMaps(bpfSpec)
 	defer btrace.CloseBPFMaps(reusedMaps)
 

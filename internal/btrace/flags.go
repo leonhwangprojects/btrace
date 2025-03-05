@@ -19,6 +19,7 @@ var (
 	disasmIntelSyntax bool
 	mode              string
 	filterArg         string
+	filterPkt         string
 
 	outputLbr       bool
 	outputFuncStack bool
@@ -57,6 +58,7 @@ func ParseFlags() (*Flags, error) {
 	f.BoolVar(&outputFuncStack, "output-stack", false, "output function call stack")
 	f.Uint32Var(&filterPid, "filter-pid", 0, "filter pid for tracing")
 	f.StringVar(&filterArg, "filter-arg", "", "filter function's argument with C expression, e.g. 'prog->type == BPF_PROG_TYPE_TRACING'")
+	f.StringVar(&filterPkt, "filter-pkt", "", "filter packet with pcap-filter(7) expr if function argument is skb or xdp, e.g. 'icmp and host 1.1.1.1'")
 	f.UintVar(&limitEvents, "limit-events", 0, "limited number events to output, 0 to output all events")
 	f.BoolVar(&flags.showFuncProto, "show-func-proto", false, "show function prototype of -p,-k")
 
@@ -64,6 +66,7 @@ func ParseFlags() (*Flags, error) {
 
 	noColorOutput = flags.outputFile != "" || !isatty(os.Stdout.Fd())
 	fnArg = prepareFuncArgument(filterArg)
+	pktFilter = preparePacketFilter(filterPkt)
 
 	return &flags, err
 }

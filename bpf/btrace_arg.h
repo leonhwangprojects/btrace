@@ -1,5 +1,5 @@
-// Copyright 2025 Leon Hwang.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-2.0 OR Apache-2.0
+/* Copyright 2025 Leon Hwang */
 
 #ifndef __BTRACE_ARG_H_
 #define __BTRACE_ARG_H_
