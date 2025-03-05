@@ -5,7 +5,8 @@
 #include "bpf_tracing.h"
 #include "bpf_map_helpers.h"
 
-#define BTRACE_MAX_ENTRIES 65536
+#include "btrace.h"
+#include "btrace_lbr.h"
 
 __u32 ready SEC(".data.ready") = 0;
 
@@ -64,21 +65,6 @@ struct btrace_fn_data {
     struct btrace_fn_arg_data args[MAX_FN_ARGS];
 };
 
-#define MAX_LBR_ENTRIES 32
-struct btrace_lbr_data {
-    struct perf_branch_entry entries[MAX_LBR_ENTRIES];
-    __s64 nr_bytes;
-};
-
-struct btrace_lbr_data btrace_lbr_buff[1] SEC(".data.lbrs");
-
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, BTRACE_MAX_ENTRIES);
-    __type(key, __u64);
-    __type(value, struct btrace_lbr_data);
-} btrace_lbrs SEC(".maps");
-
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
     __uint(max_entries, 4096<<8);
@@ -131,13 +117,6 @@ output_fn_data(struct event *event, void *ctx, void *retval, struct btrace_str_d
 
     if (use_str)
         bpf_map_update_elem(&btrace_strs, &event->session_id, str, BPF_ANY);
-}
-
-static __always_inline void
-output_lbr_data(struct event *event, struct btrace_lbr_data *lbr)
-{
-    if (lbr->nr_bytes > 0)
-        bpf_map_update_elem(&btrace_lbrs, &event->session_id, lbr, BPF_ANY);
 }
 
 static __noinline bool
@@ -208,7 +187,7 @@ emit_btrace_event(void *ctx)
         evt->func_stack_id = bpf_get_stackid(ctx, &btrace_stacks, BPF_F_FAST_STACK_CMP);
     output_fn_data(evt, ctx, (void *) retval, str);
     if (cfg->output_lbr)
-        output_lbr_data(evt, lbr);
+        output_lbr_data(lbr, evt->session_id);
 
     bpf_ringbuf_output(&btrace_events, evt, sizeof(*evt), 0);
 
