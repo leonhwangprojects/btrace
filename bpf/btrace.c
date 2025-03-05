@@ -7,32 +7,9 @@
 
 #include "btrace.h"
 #include "btrace_lbr.h"
+#include "btrace_arg.h"
 
 __u32 ready SEC(".data.ready") = 0;
-
-struct btrace_fn_arg_flags {
-    bool is_number_ptr;
-    bool is_str;
-};
-
-#define MAX_FN_ARGS 6
-struct btrace_fn_args {
-    struct btrace_fn_arg_flags args[MAX_FN_ARGS];
-    __u32 nr_fn_args;
-} __attribute__((packed));
-
-struct btrace_config {
-    __u32 output_lbr:1;
-    __u32 output_stack:1;
-    __u32 is_ret_str:1;
-    __u32 pad:29;
-    __u32 pid;
-
-    struct btrace_fn_args fn_args;
-} __attribute__((packed));
-
-volatile const struct btrace_config btrace_config = {};
-#define cfg (&btrace_config)
 
 #define MAX_STACK_DEPTH 50
 struct {
@@ -42,88 +19,12 @@ struct {
     __uint(value_size, MAX_STACK_DEPTH * sizeof(u64));
 } btrace_stacks SEC(".maps");
 
-struct btrace_str_data {
-    __u8 arg[32];
-    __u8 ret[32];
-};
-
-struct btrace_str_data btrace_str_buff[1] SEC(".data.strs");
-
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, BTRACE_MAX_ENTRIES);
-    __type(key, __u64);
-    __type(value, struct btrace_str_data);
-} btrace_strs SEC(".maps");
-
-struct btrace_fn_arg_data {
-    __u64 raw_data;
-    __u64 ptr_data;
-};
-
-struct btrace_fn_data {
-    struct btrace_fn_arg_data args[MAX_FN_ARGS];
-};
-
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
     __uint(max_entries, 4096<<8);
 } btrace_events SEC(".maps");
 
-struct event {
-    __u64 session_id;
-    __s64 func_ret;
-    __u64 func_ip;
-    __u32 cpu;
-    __u32 pid;
-    __u8 comm[16];
-    __s64 func_stack_id;
-    struct btrace_fn_data fn_data;
-} __attribute__((packed));
-
 struct event btrace_evt_buff[1] SEC(".data.events");
-
-static __always_inline void
-output_fn_data(struct event *event, void *ctx, void *retval, struct btrace_str_data *str)
-{
-    bool is_str, is_number_ptr, use_str = false;
-    __u64 arg;
-    __u32 i;
-
-    for (i = 0; i < MAX_FN_ARGS; i++) {
-        if (i >= cfg->fn_args.nr_fn_args)
-            break;
-
-        (void) bpf_get_func_arg(ctx, i, &arg); /* required 5.17 kernel. */
-        event->fn_data.args[i].raw_data = arg;
-
-        if (!arg)
-            continue;
-
-        is_str = cfg->fn_args.args[i].is_str;
-        is_number_ptr = cfg->fn_args.args[i].is_number_ptr;
-        if (is_str) {
-            use_str = true;
-            bpf_probe_read_kernel_str(&str->arg, sizeof(str->arg), (void *) arg);
-        } else if (is_number_ptr) {
-            bpf_probe_read_kernel(&event->fn_data.args[i].ptr_data, sizeof(event->fn_data.args[i].ptr_data), (void *) arg);
-        }
-    }
-
-    if (cfg->is_ret_str && retval) {
-        use_str = true;
-        bpf_probe_read_kernel_str(&str->ret, sizeof(str->ret), (void *) retval);
-    }
-
-    if (use_str)
-        bpf_map_update_elem(&btrace_strs, &event->session_id, str, BPF_ANY);
-}
-
-static __noinline bool
-filter_fnarg(void *ctx)
-{
-    return ctx != NULL;
-}
 
 static __always_inline __u64
 get_tracee_caller_fp(void)
