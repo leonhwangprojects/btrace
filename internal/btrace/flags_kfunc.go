@@ -26,6 +26,16 @@ func parseKfuncFlag(k string) (KfuncFlag, error) {
 		kf.name = strings.TrimSpace(fields[0])
 		kf.arg = strings.TrimSpace(fields[1])
 
+		// Check if arg has type info. The type info is enclosed in parentheses.
+		if kf.arg != "" && kf.arg[0] == '(' {
+			typ, err := getTypeDescFrom(kf.arg)
+			if err != nil {
+				return kf, err
+			}
+			kf.typ = strings.TrimSpace(typ)
+			kf.arg = strings.TrimSpace(kf.arg[len(typ)+2:])
+		}
+
 	case 3:
 		kf.name = strings.TrimSpace(fields[0])
 		kf.arg = strings.TrimSpace(fields[1])

@@ -119,14 +119,19 @@ func (t *bpfTracing) injectFnArg(prog *ebpf.ProgramSpec, params []btf.FuncParam)
 	}
 
 	for i, p := range params {
-		if p.Name == fnArg.name {
-			err := fnArg.inject(prog, i, p.Type)
-			if err != nil {
-				return fmt.Errorf("failed to inject func arg filter expr: %w", err)
-			}
-
-			return nil
+		if p.Name != fnArg.name {
+			continue
 		}
+		if fnArg.typ != "" && fnArg.typ != btfx.Repr(p.Type) {
+			continue
+		}
+
+		err := fnArg.inject(prog, i, p.Type)
+		if err != nil {
+			return fmt.Errorf("failed to inject func arg filter expr: %w", err)
+		}
+
+		return nil
 	}
 
 	return nil
