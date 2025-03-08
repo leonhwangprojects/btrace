@@ -93,16 +93,18 @@ func (t *bpfTracing) Close() {
 	for _, l := range t.links {
 		l := l
 		errg.Go(func() error {
-			return l.Close()
+			_ = l.Close()
+			return nil
 		})
 	}
 
-	errg.Go(func() error {
-		for _, l := range t.klnks {
+	for _, l := range t.klnks {
+		l := l
+		errg.Go(func() error {
 			_ = l.Close()
-		}
-		return nil
-	})
+			return nil
+		})
+	}
 
 	_ = errg.Wait()
 }
