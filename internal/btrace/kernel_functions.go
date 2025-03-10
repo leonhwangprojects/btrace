@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/Asphaltt/mybtf"
 	"github.com/cilium/ebpf/btf"
 
 	"github.com/leonhwangprojects/btrace/internal/btfx"
@@ -57,6 +58,11 @@ func FindKernelFuncs(funcs []string, ksyms *Kallsyms) (KFuncs, error) {
 
 			funcProto := fn.Type.(*btf.FuncProto)
 			if !matchKfunc(fn.Name, funcProto, matches) {
+				continue
+			}
+
+			if _, isStruct := mybtf.UnderlyingType(funcProto.Return).(*btf.Struct); isStruct {
+				VerboseLog("Skip function %s with struct return type", fn.Name)
 				continue
 			}
 
