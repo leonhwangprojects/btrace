@@ -282,9 +282,7 @@ func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]
 		return fmt.Errorf("failed to attach tracing: %w", err)
 	}
 
-	if verbose {
-		log.Printf("Tracing %s of prog %v", info.funcName, info.prog)
-	}
+	VerboseLog("Tracing %s of prog %v", info.funcName, info.prog)
 
 	t.llock.Lock()
 	t.progs = append(t.progs, prog)
@@ -353,9 +351,7 @@ func (t *bpfTracing) traceFunc(spec *ebpf.CollectionSpec, reusedMaps map[string]
 		return fmt.Errorf("failed to attach tracing: %w", err)
 	}
 
-	if verbose {
-		log.Printf("Tracing kernel function %s", fnName)
-	}
+	VerboseLog("Tracing kernel function %s", fnName)
 
 	t.llock.Lock()
 	t.progs = append(t.progs, prog)

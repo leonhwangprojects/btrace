@@ -65,6 +65,10 @@ func FindKernelFuncs(funcs []string, ksyms *Kallsyms) (KFuncs, error) {
 				VerboseLog("Failed to find ksym for %s", fn.Name)
 				continue
 			}
+			if ksym.duped {
+				VerboseLog("Skip multiple-addrs ksym %s", fn.Name)
+				continue
+			}
 
 			if len(funcProto.Params) <= MAX_BPF_FUNC_ARGS {
 				kf := KFunc{Ksym: ksym, Func: fn}

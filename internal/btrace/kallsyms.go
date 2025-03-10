@@ -30,7 +30,8 @@ type KsymEntry struct {
 	addr  uint64
 	name  string
 	mod   string
-	trace bool
+	extra []uint64
+	duped bool
 }
 
 // Addr returns the address of the symbol.
@@ -96,10 +97,14 @@ func NewKallsyms() (*Kallsyms, error) {
 			if len(fields) >= 4 {
 				entry.mod = strings.Trim(fields[3], "[]")
 			}
-			entry.trace = fields[1] == "T"
 
 			ks.a2s[entry.addr] = &entry
-			ks.n2s[entry.name] = &entry
+			if sym, ok := ks.n2s[entry.name]; ok {
+				sym.extra = append(sym.extra, entry.addr)
+				sym.duped = true
+			} else {
+				ks.n2s[entry.name] = &entry
+			}
 
 			switch entry.name {
 			case "_stext":
