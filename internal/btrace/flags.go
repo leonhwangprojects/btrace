@@ -19,7 +19,7 @@ var (
 	debugLog          bool
 	disasmIntelSyntax bool
 	mode              string
-	filterArg         string
+	filterArg         []string
 	filterPkt         string
 
 	outputLbr       bool
@@ -61,7 +61,7 @@ func ParseFlags() (*Flags, error) {
 	f.BoolVar(&outputFuncStack, "output-stack", false, "output function call stack")
 	f.BoolVar(&outputPkt, "output-pkt", false, "output packet's tuple info if tracee has skb/xdp argument")
 	f.Uint32Var(&filterPid, "filter-pid", 0, "filter pid for tracing")
-	f.StringVar(&filterArg, "filter-arg", "", "filter function's argument with C expression, e.g. 'prog->type == BPF_PROG_TYPE_TRACING'")
+	f.StringSliceVar(&filterArg, "filter-arg", nil, "filter function's argument with C expression, e.g. 'prog->type == BPF_PROG_TYPE_TRACING'")
 	f.StringVar(&filterPkt, "filter-pkt", "", "filter packet with pcap-filter(7) expr if function argument is skb or xdp, e.g. 'icmp and host 1.1.1.1'")
 	f.UintVar(&limitEvents, "limit-events", 0, "limited number events to output, 0 to output all events")
 	f.BoolVar(&flags.showFuncProto, "show-func-proto", false, "show function prototype of -p,-k")
@@ -71,7 +71,7 @@ func ParseFlags() (*Flags, error) {
 	err := f.Parse(os.Args)
 
 	noColorOutput = flags.outputFile != "" || !isatty(os.Stdout.Fd())
-	fnArg = prepareFuncArgument(filterArg)
+	fnArgs = prepareFuncArguments(filterArg)
 	pktFilter = preparePacketFilter(filterPkt)
 
 	return &flags, err

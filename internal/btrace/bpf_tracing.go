@@ -114,19 +114,17 @@ func TracingProgName(mode string) string {
 }
 
 func (t *bpfTracing) injectFnArg(prog *ebpf.ProgramSpec, params []btf.FuncParam, fnName string) error {
-	if fnArg.expr == "" {
+	if len(fnArgs) == 0 {
 		return nil
 	}
 
 	for i, p := range params {
-		if p.Name != fnArg.name {
-			continue
-		}
-		if fnArg.typ != "" && fnArg.typ != btfx.Repr(p.Type) {
+		arg, ok := matchFuncArgs(p)
+		if !ok {
 			continue
 		}
 
-		err := fnArg.inject(prog, i, p.Type)
+		err := arg.inject(prog, i, p.Type)
 		if err != nil {
 			return fmt.Errorf("failed to inject func arg filter expr: %w", err)
 		}
@@ -232,6 +230,7 @@ func (t *bpfTracing) injectPktOutput(prog *ebpf.ProgramSpec, params []btf.FuncPa
 			DebugLog("Injected --output-pkt to %dth param %s of %s", i, p.Name, fnName)
 			return
 		}
+
 	}
 }
 

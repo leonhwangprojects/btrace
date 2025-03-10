@@ -22,7 +22,7 @@ const (
 	injectStubFilterArg = "filter_fnarg"
 )
 
-var fnArg funcArgument
+var fnArgs []funcArgument
 
 type funcArgument struct {
 	typ  string
@@ -60,6 +60,7 @@ func prepareFuncArgument(expr string) funcArgument {
 	}
 	arg.acce = strings.Contains(arg.expr, ".") || strings.Contains(arg.expr, "->")
 
+	expr = arg.expr
 	for i := 0; i < len(expr); i++ {
 		if !strx.IsChar(expr[i]) {
 			arg.name = expr[:i]
@@ -68,6 +69,32 @@ func prepareFuncArgument(expr string) funcArgument {
 	}
 
 	return arg
+}
+
+func prepareFuncArguments(exprs []string) []funcArgument {
+	for _, expr := range exprs {
+		fnArgs = append(fnArgs, prepareFuncArgument(expr))
+	}
+
+	return fnArgs
+}
+
+func matchFuncArgs(p btf.FuncParam) (*funcArgument, bool) {
+	for i, arg := range fnArgs {
+		if arg.expr == "" {
+			continue
+		}
+		if arg.name != p.Name {
+			continue
+		}
+		if arg.typ != "" && arg.typ != btfx.Repr(p.Type) {
+			continue
+		}
+
+		return &fnArgs[i], true
+	}
+
+	return nil, false
 }
 
 func (arg *funcArgument) compile(idx int, t btf.Type) (asm.Instructions, error) {
@@ -84,6 +111,10 @@ func (arg *funcArgument) compile(idx int, t btf.Type) (asm.Instructions, error) 
 		asm.FnGetFuncArg.Call(),
 		asm.LoadMem(asm.R1, asm.R10, -8, asm.DWord),
 	}, insns...), nil
+}
+
+func clearFilterArgSubprog(prog *ebpf.ProgramSpec) {
+	clearFilterSubprog(prog, injectStubFilterArg)
 }
 
 func (arg *funcArgument) clear(prog *ebpf.ProgramSpec) {

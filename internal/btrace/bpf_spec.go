@@ -13,8 +13,8 @@ func TrimSpec(spec *ebpf.CollectionSpec) {
 			pktFilter.clear(prog)
 		}
 
-		if fnArg.expr == "" {
-			fnArg.clear(prog)
+		if len(fnArgs) == 0 {
+			clearFilterArgSubprog(prog)
 		}
 
 		if !outputPkt {
