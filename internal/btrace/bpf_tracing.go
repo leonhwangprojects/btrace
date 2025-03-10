@@ -113,7 +113,7 @@ func TracingProgName(mode string) string {
 	return fmt.Sprintf("f%s_fn", mode)
 }
 
-func (t *bpfTracing) injectFnArg(prog *ebpf.ProgramSpec, params []btf.FuncParam) error {
+func (t *bpfTracing) injectFnArg(prog *ebpf.ProgramSpec, params []btf.FuncParam, fnName string) error {
 	if fnArg.expr == "" {
 		return nil
 	}
@@ -130,6 +130,8 @@ func (t *bpfTracing) injectFnArg(prog *ebpf.ProgramSpec, params []btf.FuncParam)
 		if err != nil {
 			return fmt.Errorf("failed to inject func arg filter expr: %w", err)
 		}
+
+		DebugLog("Injected --filter-arg expr to %dth param %s of func %s", i, p.Name, fnName)
 
 		return nil
 	}
@@ -153,7 +155,7 @@ func (t *bpfTracing) injectXdpFilter(prog *ebpf.ProgramSpec, index int, typ btf.
 	return nil
 }
 
-func (t *bpfTracing) injectPktFilter(prog *ebpf.ProgramSpec, params []btf.FuncParam) error {
+func (t *bpfTracing) injectPktFilter(prog *ebpf.ProgramSpec, params []btf.FuncParam, fnName string) error {
 	if pktFilter.expr == "" {
 		return nil
 	}
@@ -172,6 +174,7 @@ func (t *bpfTracing) injectPktFilter(prog *ebpf.ProgramSpec, params []btf.FuncPa
 
 		switch stt.Name {
 		case "sk_buff":
+			DebugLog("Injecting --filter-pkt expr to %dth param %s of %s", i, p.Name, fnName)
 			return t.injectSkbFilter(prog, i, typ)
 
 		case "__sk_buff":
@@ -180,9 +183,11 @@ func (t *bpfTracing) injectPktFilter(prog *ebpf.ProgramSpec, params []btf.FuncPa
 				return err
 			}
 
+			DebugLog("Injecting --filter-pkt expr to %dth param %s of %s", i, p.Name, fnName)
 			return t.injectSkbFilter(prog, i, typ)
 
 		case "xdp_buff":
+			DebugLog("Injecting --filter-pkt expr to %dth param %s of %s", i, p.Name, fnName)
 			return t.injectXdpFilter(prog, i, typ)
 
 		case "xdp_md":
@@ -191,6 +196,7 @@ func (t *bpfTracing) injectPktFilter(prog *ebpf.ProgramSpec, params []btf.FuncPa
 				return err
 			}
 
+			DebugLog("Injecting --filter-pkt expr to %dth param %s of %s", i, p.Name, fnName)
 			return t.injectXdpFilter(prog, i, typ)
 		}
 	}
@@ -198,7 +204,7 @@ func (t *bpfTracing) injectPktFilter(prog *ebpf.ProgramSpec, params []btf.FuncPa
 	return nil
 }
 
-func (t *bpfTracing) injectPktOutput(prog *ebpf.ProgramSpec, params []btf.FuncParam) {
+func (t *bpfTracing) injectPktOutput(prog *ebpf.ProgramSpec, params []btf.FuncParam, fnName string) {
 	if !outputPkt {
 		return
 	}
@@ -218,9 +224,13 @@ func (t *bpfTracing) injectPktOutput(prog *ebpf.ProgramSpec, params []btf.FuncPa
 		switch stt.Name {
 		case "sk_buff", "__sk_buff":
 			pktOutput.outputSkb(prog, i)
+			DebugLog("Injected --output-pkt to %dth param %s of %s", i, p.Name, fnName)
+			return
 
 		case "xdp_buff", "xdp_md":
 			pktOutput.outputXdp(prog, i)
+			DebugLog("Injected --output-pkt to %dth param %s of %s", i, p.Name, fnName)
+			return
 		}
 	}
 }
@@ -232,14 +242,15 @@ func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]
 		return fmt.Errorf("failed to set btrace config: %w", err)
 	}
 
+	traceeName := info.fn.Name
 	tracingFuncName := TracingProgName(mode)
 	progSpec := spec.Programs[tracingFuncName]
 	params := info.fn.Type.(*btf.FuncProto).Params
-	t.injectPktOutput(progSpec, params)
-	if err := t.injectFnArg(progSpec, params); err != nil {
+	t.injectPktOutput(progSpec, params, traceeName)
+	if err := t.injectFnArg(progSpec, params, traceeName); err != nil {
 		return err
 	}
-	if err := t.injectPktFilter(progSpec, params); err != nil {
+	if err := t.injectPktFilter(progSpec, params, traceeName); err != nil {
 		return err
 	}
 
@@ -291,14 +302,15 @@ func (t *bpfTracing) traceFunc(spec *ebpf.CollectionSpec, reusedMaps map[string]
 		return fmt.Errorf("failed to set btrace config: %w", err)
 	}
 
+	traceeName := fn.Func.Name
 	tracingFuncName := TracingProgName(mode)
 	progSpec := spec.Programs[tracingFuncName]
 	params := fn.Func.Type.(*btf.FuncProto).Params
-	t.injectPktOutput(progSpec, params)
-	if err := t.injectFnArg(progSpec, params); err != nil {
+	t.injectPktOutput(progSpec, params, traceeName)
+	if err := t.injectFnArg(progSpec, params, traceeName); err != nil {
 		return err
 	}
-	if err := t.injectPktFilter(progSpec, params); err != nil {
+	if err := t.injectPktFilter(progSpec, params, traceeName); err != nil {
 		return err
 	}
 

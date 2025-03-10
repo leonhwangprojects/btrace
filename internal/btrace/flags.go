@@ -16,6 +16,7 @@ const (
 
 var (
 	verbose           bool
+	debugLog          bool
 	disasmIntelSyntax bool
 	mode              string
 	filterArg         string
@@ -54,6 +55,7 @@ func ParseFlags() (*Flags, error) {
 	f.UintVarP(&flags.disasmBytes, "disasm-bytes", "B", 0, "disasm bytes of kernel function, 0 to guess it automatically")
 	f.BoolVar(&disasmIntelSyntax, "disasm-intel-syntax", false, "use Intel asm syntax for disasm, ATT asm syntax by default")
 	f.BoolVarP(&verbose, "verbose", "v", false, "output verbose log")
+	f.BoolVar(&debugLog, "debug-log", false, "output many debug logs")
 	f.StringVarP(&mode, "mode", "m", TracingModeExit, "mode of btrace, exit or entry")
 	f.BoolVar(&outputLbr, "output-lbr", false, "output LBR perf event")
 	f.BoolVar(&outputFuncStack, "output-stack", false, "output function call stack")
@@ -63,6 +65,8 @@ func ParseFlags() (*Flags, error) {
 	f.StringVar(&filterPkt, "filter-pkt", "", "filter packet with pcap-filter(7) expr if function argument is skb or xdp, e.g. 'icmp and host 1.1.1.1'")
 	f.UintVar(&limitEvents, "limit-events", 0, "limited number events to output, 0 to output all events")
 	f.BoolVar(&flags.showFuncProto, "show-func-proto", false, "show function prototype of -p,-k")
+
+	f.MarkHidden("debug-log")
 
 	err := f.Parse(os.Args)
 

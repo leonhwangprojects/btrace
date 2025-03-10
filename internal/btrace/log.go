@@ -10,3 +10,9 @@ func VerboseLog(format string, args ...interface{}) {
 		log.Printf(format, args...)
 	}
 }
+
+func DebugLog(format string, args ...any) {
+	if debugLog {
+		log.Printf(format, args...)
+	}
+}
