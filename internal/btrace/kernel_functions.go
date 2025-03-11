@@ -34,6 +34,11 @@ func (k KFunc) Name() string {
 	return k.Func.Name
 }
 
+func isValistParam(p btf.FuncParam) bool {
+	_, isVoid := p.Type.(*btf.Void)
+	return p.Name == "" && isVoid
+}
+
 type KFuncs map[uintptr]KFunc
 
 func FindKernelFuncs(funcs []string, ksyms *Kallsyms) (KFuncs, error) {
@@ -58,6 +63,11 @@ func FindKernelFuncs(funcs []string, ksyms *Kallsyms) (KFuncs, error) {
 
 			funcProto := fn.Type.(*btf.FuncProto)
 			if !matchKfunc(fn.Name, funcProto, matches) {
+				continue
+			}
+
+			if isValist := len(funcProto.Params) != 0 && isValistParam(funcProto.Params[len(funcProto.Params)-1]); isValist {
+				VerboseLog("Skip function %s with variable args", fn.Name)
 				continue
 			}
 
