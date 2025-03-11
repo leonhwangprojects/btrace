@@ -20,8 +20,8 @@ GOBUILD_CGO_LDFLAGS := CGO_LDFLAGS='-O2 -g -L$(CURDIR)/lib/capstone/build -lcaps
 
 GOGEN := go generate
 
-BPF_OBJ := btrace_bpfel.o btrace_bpfeb.o feat_bpfel.o feat_bpfeb.o
-BPF_SRC := bpf/btrace.c bpf/feature.c $(wildcard bpf/*.h) $(wildcard bpf/headers/*.h)
+BPF_OBJ := btrace_bpfel.o btrace_bpfeb.o feat_bpfel.o feat_bpfeb.o traceable_bpfel.o traceable_bpfeb.o
+BPF_SRC := $(wildcard bpf/*.c) $(wildcard bpf/*.h) $(wildcard bpf/headers/*.h)
 
 BTRACE_OBJ := btrace
 BTRACE_SRC := $(shell find internal -type f -name '*.go') main.go

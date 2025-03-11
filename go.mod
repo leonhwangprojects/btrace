@@ -7,7 +7,7 @@ toolchain go1.24.0
 require (
 	github.com/Asphaltt/addr2line v0.1.1
 	github.com/Asphaltt/mybtf v0.0.0-20250214152135-9b78e6e206e7
-	github.com/cilium/ebpf v0.17.3
+	github.com/cilium/ebpf v0.17.4-0.20250310175843-23a70a77897a
 	github.com/fatih/color v1.18.0
 	github.com/gobwas/glob v0.2.3
 	github.com/hashicorp/golang-lru/v2 v2.0.7

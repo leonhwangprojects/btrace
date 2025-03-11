@@ -11,6 +11,8 @@ import (
 	"github.com/cilium/ebpf/link"
 )
 
+var hasEndbr bool
+
 type BPFFeatures struct {
 	KprobeHappened    bool
 	HasRingbuf        bool
@@ -63,6 +65,11 @@ func DetectBPFFeatures(spec *ebpf.CollectionSpec) error {
 
 	if outputFuncStack && !feat.HasGetStackID {
 		return errors.New("bpf_get_stackid() helper not supported for --output-stack")
+	}
+
+	hasEndbr, err = haveEndbrInsn(prog)
+	if err != nil {
+		return fmt.Errorf("failed to check endbr insn: %w", err)
 	}
 
 	return nil

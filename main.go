@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"slices"
 	"syscall"
+	"time"
 
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/knightsc/gapstone"
@@ -24,6 +25,7 @@ import (
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang btrace ./bpf/btrace.c -- -g -D__TARGET_ARCH_x86 -I./bpf -I./bpf/headers -I./lib/libbpf/src -Wall
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang feat ./bpf/feature.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -I./lib/libbpf/src -Wall
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang traceable ./bpf/traceable.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -I./lib/libbpf/src -Wall
 
 func main() {
 	flags, err := btrace.ParseFlags()
@@ -50,7 +52,7 @@ func main() {
 	assert.NoErr(err, "Failed to load feat bpf spec: %v")
 
 	err = btrace.DetectBPFFeatures(featBPFSpec)
-	assert.NoErr(err, "Failed to detect bpf features: %v")
+	assert.NoVerifierErr(err, "Failed to detect bpf features: %v")
 
 	if flags.OutputLbr() {
 		lbrPerfEvents, err := btrace.OpenLbrPerfEvent()
@@ -65,6 +67,15 @@ func main() {
 	btrace.VerboseLog("Reading /proc/kallsyms ..")
 	kallsyms, err := btrace.NewKallsyms()
 	assert.NoErr(err, "Failed to read /proc/kallsyms: %v")
+
+	kfuncs, err := btrace.FindKernelFuncs(flags.Kfuncs(), kallsyms)
+	assert.NoErr(err, "Failed to find kernel functions: %v")
+
+	btrace.VerboseLog("Detect %d kernel functions traceable ..", len(kfuncs))
+	traceableBPFSpec, err := loadTraceable()
+	assert.NoErr(err, "Failed to load traceable bpf spec: %v")
+	kfuncs, err = btrace.DetectTraceable(traceableBPFSpec, kfuncs)
+	assert.NoVerifierErr(err, "Failed to detect traceable for kfuncs: %v")
 
 	var addr2line *btrace.Addr2Line
 
@@ -97,9 +108,6 @@ func main() {
 	assert.NoErr(err, "Failed to get bpf progs: %v")
 	defer bpfProgs.Close()
 
-	kfuncs, err := btrace.FindKernelFuncs(flags.Kfuncs(), kallsyms)
-	assert.NoErr(err, "Failed to find kernel functions: %v")
-
 	tracingTargets := bpfProgs.Tracings()
 	assert.True(len(tracingTargets)+len(kfuncs) != 0, "No tracing target")
 
@@ -117,9 +125,14 @@ func main() {
 		log.Printf("btrace is tracing %d kernel functions, this may take a while", len(kfuncs))
 	}
 
+	tstarted := time.Now()
 	tracings, err := btrace.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets, kfuncs)
 	assert.NoVerifierErr(err, "Failed to trace: %v")
+	btrace.DebugLog("Tracing %d tracees cost %s", len(tracings.Progs()), time.Since(tstarted))
+	var tended time.Time
+	defer func() { btrace.DebugLog("Untracing %d tracees cost %s", len(tracings.Progs()), time.Since(tended)) }()
 	defer tracings.Close()
+	defer func() { tended = time.Now() }()
 	assert.True(tracings.HaveTracing(), "No tracing target")
 
 	btrace.DebugLog("Current pid is %d", os.Getpid())
