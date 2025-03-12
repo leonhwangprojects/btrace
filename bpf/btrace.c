@@ -64,6 +64,7 @@ emit_btrace_event(void *ctx)
     struct btrace_str_data *str;
     struct btrace_pkt_data *pkt;
     struct event *evt;
+    size_t event_sz;
     __u64 retval;
     __u32 cpu;
 
@@ -107,7 +108,9 @@ emit_btrace_event(void *ctx)
     if (cfg->output_pkt)
         output_pkt_tuple(ctx, pkt, evt->session_id);
 
-    bpf_ringbuf_output(&btrace_events, evt, sizeof(*evt), 0);
+    event_sz  = offsetof(struct event, fn_data);
+    event_sz += sizeof(struct btrace_fn_arg_data) * cfg->fn_args.nr_fn_args;
+    bpf_ringbuf_output(&btrace_events, evt, event_sz, 0);
 
     return BPF_OK;
 }

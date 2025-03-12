@@ -50,6 +50,10 @@ struct event {
     __u32 pid;
     __u8 comm[16];
     __s64 func_stack_id;
+
+    /* fn_data must be the last attr of event in order to output arg data on
+     * demand.
+     */
     struct btrace_fn_data fn_data;
 } __attribute__((packed));
 

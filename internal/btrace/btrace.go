@@ -117,7 +117,7 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			return fmt.Errorf("failed to read ringbuf: %w", err)
 		}
 
-		if len(record.RawSample) < int(unsafe.Sizeof(Event{})) {
+		if len(record.RawSample) < int(unsafe.Sizeof(Event{}))-int(unsafe.Sizeof(FnData{})) {
 			continue
 		}
 
