@@ -19,7 +19,7 @@ type bpfTracingInfo struct {
 	params   []FuncParamFlags
 }
 
-func getFuncParams(fn *btf.Func) []FuncParamFlags {
+func getFuncParams(fn *btf.Func) ([]FuncParamFlags, error) {
 	strUsed := false // Only one string is allowed
 	fnParams := fn.Type.(*btf.FuncProto).Params
 	params := make([]FuncParamFlags, 0, len(fnParams))
@@ -27,12 +27,33 @@ func getFuncParams(fn *btf.Func) []FuncParamFlags {
 		v := btfx.IsStr(p.Type)
 		isStr := v && !strUsed
 		strUsed = strUsed || v
+
+		size, err := btf.Sizeof(p.Type)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get size of type %v: %w", p.Type, err)
+		}
+
+		if size > 16 {
+			return nil, fmt.Errorf("size of type %v is too large: %d", p.Type, size)
+		}
+		if size > 8 {
+			// struct arg occupies 2 regs
+			params = append(params,
+				FuncParamFlags{},
+				FuncParamFlags{
+					partOfPrevParam: true,
+				})
+			continue
+		}
+
 		params = append(params, FuncParamFlags{
-			IsNumberPtr: btfx.IsNumberPointer(p.Type),
-			IsStr:       isStr,
+			ParamFlags: ParamFlags{
+				IsNumberPtr: btfx.IsNumberPointer(p.Type),
+				IsStr:       isStr,
+			},
 		})
 	}
-	return params
+	return params, nil
 }
 
 func getProgFunc(info *ebpf.ProgramInfo, funcName string) (*btf.Func, error) {
@@ -66,11 +87,16 @@ func (p *bpfProgs) addTracing(id ebpf.ProgramID, funcName string, prog *ebpf.Pro
 			return fmt.Errorf("failed to get func for %s: %w", funcName, err)
 		}
 
+		params, err := getFuncParams(fn)
+		if err != nil {
+			return fmt.Errorf("failed to get func params for %s: %w", funcName, err)
+		}
+
 		p.tracings[key] = bpfTracingInfo{
 			prog:     prev,
 			fn:       fn,
 			funcName: funcName,
-			params:   getFuncParams(fn),
+			params:   params,
 		}
 
 		return nil
@@ -91,13 +117,18 @@ func (p *bpfProgs) addTracing(id ebpf.ProgramID, funcName string, prog *ebpf.Pro
 		return fmt.Errorf("failed to get func for %s: %w", funcName, err)
 	}
 
+	params, err := getFuncParams(fn)
+	if err != nil {
+		return fmt.Errorf("failed to get func params for %s: %w", funcName, err)
+	}
+
 	p.progs[id] = cloned
 	p.infos[id] = info
 	p.tracings[key] = bpfTracingInfo{
 		prog:     cloned,
 		fn:       fn,
 		funcName: funcName,
-		params:   getFuncParams(fn),
+		params:   params,
 	}
 
 	return nil

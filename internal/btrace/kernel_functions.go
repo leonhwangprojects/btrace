@@ -5,7 +5,6 @@ package btrace
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/Asphaltt/mybtf"
@@ -15,12 +14,17 @@ import (
 )
 
 const (
-	MAX_BPF_FUNC_ARGS = 6
+	MAX_BPF_FUNC_ARGS      = 12
+	MAX_BPF_FUNC_ARGS_PREV = 6
 )
 
-type FuncParamFlags struct {
+type ParamFlags struct {
 	IsNumberPtr bool
 	IsStr       bool
+}
+type FuncParamFlags struct {
+	ParamFlags
+	partOfPrevParam bool
 }
 
 type KFunc struct {
@@ -41,11 +45,7 @@ func isValistParam(p btf.FuncParam) bool {
 
 type KFuncs map[uintptr]KFunc
 
-func FindKernelFuncs(funcs []string, ksyms *Kallsyms) (KFuncs, error) {
-	if len(funcs) == 0 {
-		return KFuncs{}, nil
-	}
-
+func findKernelFuncs(funcs []string, ksyms *Kallsyms, maxArgs int, findManyArgs, silent bool) (KFuncs, error) {
 	matches, err := kfuncFlags2matches(funcs)
 	if err != nil {
 		return KFuncs{}, err
@@ -67,33 +67,49 @@ func FindKernelFuncs(funcs []string, ksyms *Kallsyms) (KFuncs, error) {
 			}
 
 			if isValist := len(funcProto.Params) != 0 && isValistParam(funcProto.Params[len(funcProto.Params)-1]); isValist {
-				VerboseLog("Skip function %s with variable args", fn.Name)
+				verboseLogIf(!silent, "Skip function %s with variable args", fn.Name)
 				continue
 			}
 
 			if _, isStruct := mybtf.UnderlyingType(funcProto.Return).(*btf.Struct); isStruct {
-				VerboseLog("Skip function %s with struct return type", fn.Name)
+				verboseLogIf(!silent, "Skip function %s with struct return type", fn.Name)
 				continue
 			}
 
 			ksym, ok := ksyms.n2s[fn.Name]
 			if !ok {
-				VerboseLog("Failed to find ksym for %s", fn.Name)
+				verboseLogIf(!silent, "Failed to find ksym for %s", fn.Name)
 				continue
 			}
 			if ksym.duped {
-				VerboseLog("Skip multiple-addrs ksym %s", fn.Name)
+				verboseLogIf(!silent, "Skip multiple-addrs ksym %s", fn.Name)
 				continue
 			}
 
-			if len(funcProto.Params) <= MAX_BPF_FUNC_ARGS {
+			params, err := getFuncParams(fn)
+			if err != nil {
+				verboseLogIf(!silent, "Failed to get params for %s: %v", fn.Name, err)
+				continue
+			}
+
+			if findManyArgs {
+				if MAX_BPF_FUNC_ARGS_PREV < len(funcProto.Params) && len(funcProto.Params) <= MAX_BPF_FUNC_ARGS {
+					kf := KFunc{Ksym: ksym, Func: fn}
+					kf.Prms = params
+					kf.IsRetStr = btfx.IsStr(funcProto.Return)
+					kfuncs[uintptr(ksym.addr)] = kf
+				}
+				continue
+			}
+
+			if len(funcProto.Params) <= maxArgs {
 				kf := KFunc{Ksym: ksym, Func: fn}
-				kf.Prms = getFuncParams(fn)
+				kf.Prms = params
 				kf.IsRetStr = btfx.IsStr(funcProto.Return)
 				kfuncs[uintptr(ksym.addr)] = kf
-			} else if verbose {
-				log.Printf("Skip function %s with %d args because of limit %d args\n",
-					fn.Name, len(funcProto.Params), MAX_BPF_FUNC_ARGS)
+			} else {
+				verboseLogIf(!silent, "Skip function %s with %d args because of limit %d args\n",
+					fn.Name, len(funcProto.Params), maxArgs)
 			}
 		}
 	}
@@ -126,4 +142,12 @@ func FindKernelFuncs(funcs []string, ksyms *Kallsyms) (KFuncs, error) {
 	}
 
 	return kfuncs, nil
+}
+
+func FindKernelFuncs(funcs []string, ksyms *Kallsyms, maxArgs int) (KFuncs, error) {
+	if len(funcs) == 0 {
+		return KFuncs{}, nil
+	}
+
+	return findKernelFuncs(funcs, ksyms, maxArgs, false, false)
 }

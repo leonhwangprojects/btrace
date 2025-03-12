@@ -13,7 +13,7 @@ struct btrace_fn_arg_flags {
     bool is_str;
 };
 
-#define MAX_FN_ARGS 6
+#define MAX_FN_ARGS 12
 struct btrace_fn_args {
     struct btrace_fn_arg_flags args[MAX_FN_ARGS];
     __u32 nr_fn_args;

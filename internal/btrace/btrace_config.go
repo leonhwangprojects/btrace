@@ -13,7 +13,7 @@ const (
 type BtraceConfig struct {
 	Flags     uint32
 	FilterPid uint32
-	FnArgs    [MAX_BPF_FUNC_ARGS]FuncParamFlags
+	FnArgs    [MAX_BPF_FUNC_ARGS]ParamFlags
 	FnArgsNr  uint32
 }
 

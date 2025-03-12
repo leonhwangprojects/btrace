@@ -94,6 +94,12 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 		color.RGB(0x9c, 0x91, 0x91),
 		color.RGB(0x7c, 0x74, 0x74),
 		color.RGB(0x5c, 0x54, 0x54),
+		color.RGB(0x9d, 0x9d, 0x9d),
+		color.RGB(0x7a, 0x7a, 0x7a),
+		color.RGB(0x54, 0x54, 0x54),
+		color.RGB(0x9c, 0x91, 0x91),
+		color.RGB(0x7c, 0x74, 0x74),
+		color.RGB(0x5c, 0x54, 0x54),
 	}
 
 	findSymbol := func(addr uint64) string {
@@ -106,9 +112,12 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 
 	var sb strings.Builder
 
+	var record ringbuf.Record
+	record.RawSample = make([]byte, int(unsafe.Sizeof(Event{})))
+
 	unlimited := limitEvents == 0
 	for i := int64(limitEvents); unlimited || i > 0; i-- {
-		record, err := reader.Read()
+		err := reader.ReadInto(&record)
 		if err != nil {
 			if errors.Is(err, ringbuf.ErrClosed) {
 				return nil
@@ -202,10 +211,18 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 		fmt.Fprintf(&sb, "=(")
 		if funcProto != nil {
 			params := funcProto.Type.(*btf.FuncProto).Params
-			lastIdx := len(params) - 1
+			lastIdx, idx := len(params)-1, 0
 			s := strData.arg()
 			strUsed := false
 			for i, fnParam := range funcParams {
+				if fnParam.partOfPrevParam {
+					continue
+				}
+
+				if idx != 0 {
+					fmt.Fprint(&sb, ", ")
+				}
+
 				arg := event.Func.Args[i]
 
 				if strUsed {
@@ -213,16 +230,19 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 				}
 				strUsed = strUsed || fnParam.IsStr
 
-				fp := btfx.ReprFuncParam(&params[i], i, fnParam.IsStr, fnParam.IsNumberPtr, arg[0], arg[1], s, findSymbol)
+				valNext := arg[0]
+				if i < lastIdx {
+					valNext = event.Func.Args[i+1][0]
+				}
+
+				fp := btfx.ReprFuncParam(&params[idx], i, fnParam.IsStr, fnParam.IsNumberPtr, arg[0], arg[1], valNext, s, findSymbol)
 				if colorOutput {
 					funcParamColors[i].Fprint(&sb, fp)
 				} else {
 					fmt.Fprintf(&sb, "%s", fp)
 				}
 
-				if i != lastIdx {
-					fmt.Fprintf(&sb, ", ")
-				}
+				idx++
 			}
 		} else {
 			fmt.Fprintf(&sb, "..UNK..")

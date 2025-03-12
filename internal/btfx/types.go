@@ -6,6 +6,7 @@ package btfx
 import (
 	"fmt"
 	"strings"
+	"unsafe"
 
 	"github.com/Asphaltt/mybtf"
 	"github.com/cilium/ebpf/btf"
@@ -217,7 +218,29 @@ func ReprEnumValue(t btf.Type, val uint64) string {
 	return fmt.Sprintf("%d", val)
 }
 
-func ReprValue(t btf.Type, val uint64, find findSymbol) string {
+func reprMember(sb *strings.Builder, m *btf.Member, data []byte, find findSymbol) {
+	if m.Name != "" {
+		fmt.Fprintf(sb, "%s=", m.Name)
+	}
+	if m.BitfieldSize != 0 {
+		fmt.Fprintf(sb, "..BITFIELD..")
+	} else {
+		fmt.Fprintf(sb, "%s", ReprValue(m.Type, *(*uint64)(unsafe.Pointer(&data[m.Offset])), *(*uint64)(unsafe.Pointer(&data[m.Offset+8])), find))
+	}
+}
+
+func reprStructUnion(sb *strings.Builder, name string, members []btf.Member, data []byte, find findSymbol) {
+	fmt.Fprintf(sb, "%s{", name)
+	for i, m := range members {
+		if i > 0 {
+			fmt.Fprint(sb, ",")
+		}
+		reprMember(sb, &m, data, find)
+	}
+	fmt.Fprint(sb, "}")
+}
+
+func ReprValue(t btf.Type, val, valNext uint64, find findSymbol) string {
 	t = mybtf.UnderlyingType(t)
 
 	var sb strings.Builder
@@ -225,6 +248,21 @@ func ReprValue(t btf.Type, val uint64, find findSymbol) string {
 	size, err := btf.Sizeof(t)
 	if err != nil {
 		fmt.Fprintf(&sb, "..ERR..")
+		return sb.String()
+	}
+
+	if stt, ok := t.(*btf.Struct); ok {
+		var data [24]byte
+		*(*uint64)(unsafe.Pointer(&data[0])) = val
+		*(*uint64)(unsafe.Pointer(&data[8])) = valNext
+		reprStructUnion(&sb, stt.Name, stt.Members, data[:], find)
+		return sb.String()
+	}
+	if unn, ok := t.(*btf.Union); ok {
+		var data [24]byte
+		*(*uint64)(unsafe.Pointer(&data[0])) = val
+		*(*uint64)(unsafe.Pointer(&data[8])) = valNext
+		reprStructUnion(&sb, unn.Name, unn.Members, data[:], find)
 		return sb.String()
 	}
 
@@ -284,7 +322,7 @@ func ReprValue(t btf.Type, val uint64, find findSymbol) string {
 	return sb.String()
 }
 
-func ReprFuncParam(param *btf.FuncParam, i int, isStr, isNumberPtr bool, data, data2 uint64, s string, f findSymbol) string {
+func ReprFuncParam(param *btf.FuncParam, i int, isStr, isNumberPtr bool, data, data2, dataNext uint64, s string, f findSymbol) string {
 	var sb strings.Builder
 
 	typ := param.Type
@@ -303,12 +341,12 @@ func ReprFuncParam(param *btf.FuncParam, i int, isStr, isNumberPtr bool, data, d
 			fmt.Fprintf(&sb, "\"%s\"", s)
 		} else if data != 0 {
 			typ = mybtf.UnderlyingType(typ).(*btf.Pointer).Target
-			fmt.Fprintf(&sb, "%#x(%s)", data, ReprValue(typ, data2, f))
+			fmt.Fprintf(&sb, "%#x(%s)", data, ReprValue(typ, data2, dataNext, f))
 		} else {
 			fmt.Fprintf(&sb, "%#x", data)
 		}
 	} else {
-		fmt.Fprint(&sb, ReprValue(typ, data, f))
+		fmt.Fprint(&sb, ReprValue(typ, data, dataNext, f))
 	}
 
 	return sb.String()
@@ -327,7 +365,7 @@ func ReprFuncReturn(typ btf.Type, val int64, s string, f findSymbol) string {
 	var sb strings.Builder
 
 	fmt.Fprintf(&sb, "(%v)", Repr(typ))
-	fmt.Fprint(&sb, ReprValue(typ, uint64(val), f))
+	fmt.Fprint(&sb, ReprValue(typ, uint64(val), 0 /* struct cannot be return value */, f))
 
 	return sb.String()
 }

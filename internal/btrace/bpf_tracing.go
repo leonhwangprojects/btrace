@@ -39,7 +39,7 @@ func setBtraceConfig(spec *ebpf.CollectionSpec, args []FuncParamFlags, isRetStr 
 	cfg.FilterPid = filterPid
 	cfg.FnArgsNr = uint32(len(args))
 	for i, arg := range args {
-		cfg.FnArgs[i] = arg
+		cfg.FnArgs[i] = arg.ParamFlags
 	}
 
 	if err := spec.Variables["btrace_config"].Set(cfg); err != nil {

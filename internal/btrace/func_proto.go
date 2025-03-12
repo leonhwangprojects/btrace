@@ -84,7 +84,7 @@ func ShowFuncProto(f *Flags) {
 			fmt.Fprintln(&sb)
 		}
 
-		kfuncs, err := FindKernelFuncs(f.kfuncs, kallsyms)
+		kfuncs, err := findKernelFuncs(f.kfuncs, kallsyms, MAX_BPF_FUNC_ARGS, false, true)
 		assert.NoErr(err, "Failed to find kernel functions: %v")
 
 		fmt.Fprint(&sb, "Kernel functions:")

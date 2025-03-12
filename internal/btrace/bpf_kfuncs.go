@@ -83,7 +83,7 @@ func detectTraceable(spec *ebpf.CollectionSpec, addrs []uintptr) ([]uintptr, err
 	return nontraceables, nil
 }
 
-func DetectTraceable(spec *ebpf.CollectionSpec, kfuncs KFuncs) (KFuncs, error) {
+func detectTraceables(spec *ebpf.CollectionSpec, kfuncs KFuncs, silent bool) (KFuncs, error) {
 	addrs := maps.Keys(kfuncs)
 	slices.Sort(addrs)
 
@@ -103,10 +103,14 @@ func DetectTraceable(spec *ebpf.CollectionSpec, kfuncs KFuncs) (KFuncs, error) {
 		}
 
 		for _, nt := range nontraceables {
-			VerboseLog("Skip non-traceable kernel function %s", kfuncs[nt].Ksym.name)
+			verboseLogIf(!silent, "Skip non-traceable kernel function %s", kfuncs[nt].Ksym.name)
 			delete(kfuncs, nt)
 		}
 	}
 
 	return kfuncs, nil
+}
+
+func DetectTraceable(spec *ebpf.CollectionSpec, kfuncs KFuncs) (KFuncs, error) {
+	return detectTraceables(spec, kfuncs, false)
 }

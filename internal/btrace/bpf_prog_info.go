@@ -110,7 +110,7 @@ func newBPFProgInfo(prog *ebpf.Program) (*bpfProgInfo, error) {
 		info.kaddrRange.end = info.kaddrRange.start + uintptr(funcLen)
 		info.funcName = strings.TrimSpace(funcInfos[i].Func.Name)
 		info.funcProto = funcInfos[i].Func
-		info.funcParams = getFuncParams(funcInfos[i].Func)
+		info.funcParams, _ /* won't fail for bpf progs */ = getFuncParams(funcInfos[i].Func)
 
 		for i, kaddr := range jitedLineInfos {
 			if info.kaddrRange.start <= uintptr(kaddr) && uintptr(kaddr) < info.kaddrRange.end {

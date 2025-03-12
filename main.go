@@ -68,12 +68,20 @@ func main() {
 	kallsyms, err := btrace.NewKallsyms()
 	assert.NoErr(err, "Failed to read /proc/kallsyms: %v")
 
-	kfuncs, err := btrace.FindKernelFuncs(flags.Kfuncs(), kallsyms)
+	traceableBPFSpec, err := loadTraceable()
+	assert.NoErr(err, "Failed to load traceable bpf spec: %v")
+	bpfSpec, err := loadBtrace()
+	assert.NoErr(err, "Failed to load bpf spec: %v")
+	delete(bpfSpec.Programs, btrace.TracingProgName(flags.OtherMode()))
+
+	maxArg, err := btrace.DetectSupportedMaxArg(traceableBPFSpec, bpfSpec, kallsyms)
+	assert.NoErr(err, "Failed to detect supported func max arg: %v")
+	btrace.VerboseLog("Max arg count limits to %d", maxArg)
+
+	kfuncs, err := btrace.FindKernelFuncs(flags.Kfuncs(), kallsyms, maxArg)
 	assert.NoErr(err, "Failed to find kernel functions: %v")
 
 	btrace.VerboseLog("Detect %d kernel functions traceable ..", len(kfuncs))
-	traceableBPFSpec, err := loadTraceable()
-	assert.NoErr(err, "Failed to load traceable bpf spec: %v")
 	kfuncs, err = btrace.DetectTraceable(traceableBPFSpec, kfuncs)
 	assert.NoVerifierErr(err, "Failed to detect traceable for kfuncs: %v")
 
@@ -112,9 +120,6 @@ func main() {
 	assert.True(len(tracingTargets)+len(kfuncs) != 0, "No tracing target")
 
 	btrace.VerboseLog("Tracing bpf progs or kernel functions ..")
-	bpfSpec, err := loadBtrace()
-	assert.NoErr(err, "Failed to load bpf spec: %v")
-	delete(bpfSpec.Programs, btrace.TracingProgName(flags.OtherMode()))
 
 	btrace.TrimSpec(bpfSpec)
 

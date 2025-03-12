@@ -64,9 +64,10 @@ emit_btrace_event(void *ctx)
     struct btrace_str_data *str;
     struct btrace_pkt_data *pkt;
     struct event *evt;
+    __u64 session_id;
     size_t event_sz;
+    __u32 cpu, pid;
     __u64 retval;
-    __u32 cpu;
 
     if (!ready)
         return BPF_OK;
@@ -84,29 +85,31 @@ emit_btrace_event(void *ctx)
      * LBR entries.
      */
 
-    evt->pid = bpf_get_current_pid_tgid() >> 32;
-    if (evt->pid == PID)
+    pid = bpf_get_current_pid_tgid() >> 32;
+    if (pid == PID)
         return BPF_OK;
-    if (cfg->pid && evt->pid != cfg->pid)
-        return BPF_OK;
-
-    evt->session_id = gen_session_id();
-    if (!filter(ctx, evt->session_id))
+    if (cfg->pid && pid != cfg->pid)
         return BPF_OK;
 
+    session_id = gen_session_id();
+    if (!filter(ctx, session_id))
+        return BPF_OK;
+
+    evt->session_id = session_id;
     bpf_get_func_ret(ctx, (void *) &retval); /* required 5.17 kernel. */
     evt->func_ret = retval;
     evt->func_ip = bpf_get_func_ip(ctx); /* required 5.17 kernel. */
     evt->cpu = cpu;
+    evt->pid = pid;
     bpf_get_current_comm(evt->comm, sizeof(evt->comm));
     evt->func_stack_id = -1;
     if (cfg->output_stack)
         evt->func_stack_id = bpf_get_stackid(ctx, &btrace_stacks, BPF_F_FAST_STACK_CMP);
     output_fn_data(evt, ctx, (void *) retval, str);
     if (cfg->output_lbr)
-        output_lbr_data(lbr, evt->session_id);
+        output_lbr_data(lbr, session_id);
     if (cfg->output_pkt)
-        output_pkt_tuple(ctx, pkt, evt->session_id);
+        output_pkt_tuple(ctx, pkt, session_id);
 
     event_sz  = offsetof(struct event, fn_data);
     event_sz += sizeof(struct btrace_fn_arg_data) * cfg->fn_args.nr_fn_args;
