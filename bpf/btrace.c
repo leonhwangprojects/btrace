@@ -7,7 +7,7 @@
 
 #include "btrace.h"
 #include "btrace_lbr.h"
-#include "btrace_arg.h"
+#include "btrace_str.h"
 #include "btrace_pkt_filter.h"
 #include "btrace_pkt_output.h"
 

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0 OR Apache-2.0
 /* Copyright 2025 Leon Hwang */
 
-#ifndef __BTRACE_ARG_H_
-#define __BTRACE_ARG_H_
+#ifndef __BTRACE_STR_H_
+#define __BTRACE_STR_H_
 
 #include "vmlinux.h"
 
@@ -66,4 +66,4 @@ filter_fnarg(void *ctx)
     return ctx != NULL;
 }
 
-#endif // __BTRACE_ARG_H_
+#endif // __BTRACE_STR_H_
