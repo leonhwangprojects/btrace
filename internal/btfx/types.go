@@ -223,7 +223,7 @@ func reprMember(sb *strings.Builder, m *btf.Member, data []byte, find findSymbol
 		fmt.Fprintf(sb, "%s=", m.Name)
 	}
 	if m.BitfieldSize != 0 {
-		fmt.Fprintf(sb, "..BITFIELD..")
+		fmt.Fprintf(sb, mybtf.DumpBitfield(m.Offset, m.BitfieldSize, data))
 	} else {
 		fmt.Fprintf(sb, "%s", ReprValue(m.Type, *(*uint64)(unsafe.Pointer(&data[m.Offset])), *(*uint64)(unsafe.Pointer(&data[m.Offset+8])), find))
 	}
