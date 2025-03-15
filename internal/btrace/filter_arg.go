@@ -22,7 +22,7 @@ const (
 	injectStubFilterArg = "filter_fnarg"
 )
 
-var fnArgs []funcArgument
+var argFilter []funcArgument
 
 type funcArgument struct {
 	typ  string
@@ -45,6 +45,10 @@ func getTypeDescFrom(s string) (string, error) {
 	return "", fmt.Errorf("failed to get type description from %s", s)
 }
 
+func isValidChar(c byte) bool {
+	return strx.IsChar(c) || c == '_' || strx.IsDigit(c)
+}
+
 func prepareFuncArgument(expr string) funcArgument {
 	var arg funcArgument
 
@@ -62,7 +66,7 @@ func prepareFuncArgument(expr string) funcArgument {
 
 	expr = arg.expr
 	for i := 0; i < len(expr); i++ {
-		if !strx.IsChar(expr[i]) {
+		if !isValidChar(expr[i]) {
 			arg.name = expr[:i]
 			break
 		}
@@ -73,14 +77,14 @@ func prepareFuncArgument(expr string) funcArgument {
 
 func prepareFuncArguments(exprs []string) []funcArgument {
 	for _, expr := range exprs {
-		fnArgs = append(fnArgs, prepareFuncArgument(expr))
+		argFilter = append(argFilter, prepareFuncArgument(expr))
 	}
 
-	return fnArgs
+	return argFilter
 }
 
 func matchFuncArgs(p btf.FuncParam) (*funcArgument, bool) {
-	for i, arg := range fnArgs {
+	for i, arg := range argFilter {
 		if arg.expr == "" {
 			continue
 		}
@@ -91,7 +95,7 @@ func matchFuncArgs(p btf.FuncParam) (*funcArgument, bool) {
 			continue
 		}
 
-		return &fnArgs[i], true
+		return &argFilter[i], true
 	}
 
 	return nil, false

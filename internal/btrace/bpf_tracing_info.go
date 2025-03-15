@@ -6,6 +6,7 @@ package btrace
 import (
 	"fmt"
 
+	"github.com/Asphaltt/mybtf"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
 
@@ -15,6 +16,7 @@ import (
 type bpfTracingInfo struct {
 	prog     *ebpf.Program
 	fn       *btf.Func
+	funcIP   uintptr
 	funcName string
 	params   []FuncParamFlags
 }
@@ -24,7 +26,7 @@ func getFuncParams(fn *btf.Func) ([]FuncParamFlags, error) {
 	fnParams := fn.Type.(*btf.FuncProto).Params
 	params := make([]FuncParamFlags, 0, len(fnParams))
 	for _, p := range fnParams {
-		v := btfx.IsStr(p.Type)
+		v := mybtf.IsConstCharPtr(p.Type)
 		isStr := v && !strUsed
 		strUsed = strUsed || v
 
@@ -56,19 +58,14 @@ func getFuncParams(fn *btf.Func) ([]FuncParamFlags, error) {
 	return params, nil
 }
 
-func getProgFunc(info *ebpf.ProgramInfo, funcName string) (*btf.Func, error) {
-	fns, err := info.FuncInfos()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get func infos: %w", err)
-	}
-
-	for _, fn := range fns {
+func getProgFunc(fns btf.FuncOffsets, funcName string) (int, error) {
+	for i, fn := range fns {
 		if fn.Func.Name == funcName {
-			return fn.Func, nil
+			return i, nil
 		}
 	}
 
-	return nil, fmt.Errorf("failed to find func %s", funcName)
+	return -1, fmt.Errorf("failed to find func %s", funcName)
 }
 
 func (p *bpfProgs) addTracing(id ebpf.ProgramID, funcName string, prog *ebpf.Program) error {
@@ -81,52 +78,52 @@ func (p *bpfProgs) addTracing(id ebpf.ProgramID, funcName string, prog *ebpf.Pro
 		return nil
 	}
 
-	if prev, ok := p.progs[id]; ok {
-		fn, err := getProgFunc(p.infos[id], funcName)
+	info, ok := p.infos[id]
+	if !ok {
+		i, err := prog.Info()
 		if err != nil {
-			return fmt.Errorf("failed to get func for %s: %w", funcName, err)
+			return fmt.Errorf("failed to get info for %d: %w", id, err)
 		}
 
-		params, err := getFuncParams(fn)
-		if err != nil {
-			return fmt.Errorf("failed to get func params for %s: %w", funcName, err)
-		}
-
-		p.tracings[key] = bpfTracingInfo{
-			prog:     prev,
-			fn:       fn,
-			funcName: funcName,
-			params:   params,
-		}
-
-		return nil
+		info = i
 	}
 
-	cloned, err := prog.Clone()
+	jitedKsymAddrs, ok := info.JitedKsymAddrs()
+	if !ok {
+		return fmt.Errorf("failed to get jited ksym addrs for %d", id)
+	}
+
+	fns, err := info.FuncInfos()
 	if err != nil {
-		return fmt.Errorf("failed to clone prog %d: %w", id, err)
+		return fmt.Errorf("failed to get func infos for %d: %w", id, err)
 	}
 
-	info, err := prog.Info()
-	if err != nil {
-		return fmt.Errorf("failed to get prog info for %d: %w", id, err)
-	}
-
-	fn, err := getProgFunc(info, funcName)
+	idx, err := getProgFunc(fns, funcName)
 	if err != nil {
 		return fmt.Errorf("failed to get func for %s: %w", funcName, err)
 	}
 
-	params, err := getFuncParams(fn)
+	params, err := getFuncParams(fns[idx].Func)
 	if err != nil {
 		return fmt.Errorf("failed to get func params for %s: %w", funcName, err)
 	}
 
-	p.progs[id] = cloned
-	p.infos[id] = info
+	if prev, ok := p.progs[id]; !ok {
+		prog, err = prog.Clone()
+		if err != nil {
+			return fmt.Errorf("failed to clone prog %d: %w", id, err)
+		}
+
+		p.progs[id] = prog
+		p.infos[id] = info
+	} else {
+		prog = prev
+	}
+
 	p.tracings[key] = bpfTracingInfo{
-		prog:     cloned,
-		fn:       fn,
+		prog:     prog,
+		fn:       fns[idx].Func,
+		funcIP:   jitedKsymAddrs[idx],
 		funcName: funcName,
 		params:   params,
 	}

@@ -10,60 +10,32 @@
 
 #include "btrace.h"
 
-struct btrace_str_data {
-    __u8 arg[32];
-    __u8 ret[32];
+struct btrace_arg_data {
+    __u64 data[4][2]; /* 4 attrs */
+    __u8 str[32];  /* 1 string */
 };
 
-struct btrace_str_data btrace_str_buff[1] SEC(".data.strs");
+struct btrace_arg_data btrace_arg_buff[1] SEC(".data.args");
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, BTRACE_MAX_ENTRIES);
     __type(key, __u64);
-    __type(value, struct btrace_str_data);
-} btrace_strs SEC(".maps");
+    __type(value, struct btrace_arg_data);
+} btrace_args SEC(".maps");
 
-static __always_inline void
-output_fn_data(struct event *event, void *ctx, void *retval, struct btrace_str_data *str)
+static __noinline void
+__output_arg_data(struct btrace_arg_data *data, __u64 session_id)
 {
-    bool is_str, is_number_ptr, use_str = false;
-    __u64 arg;
-    __u32 i;
-
-    for (i = 0; i < MAX_FN_ARGS; i++) {
-        if (i >= cfg->fn_args.nr_fn_args)
-            break;
-
-        (void) bpf_get_func_arg(ctx, i, &arg); /* required 5.17 kernel. */
-        event->fn_data.args[i].raw_data = arg;
-
-        if (!arg)
-            continue;
-
-        is_str = cfg->fn_args.args[i].is_str;
-        is_number_ptr = cfg->fn_args.args[i].is_number_ptr;
-        if (is_str) {
-            use_str = true;
-            (void) bpf_probe_read_kernel_str(&str->arg, sizeof(str->arg), (void *) arg);
-        } else if (is_number_ptr) {
-            (void) bpf_probe_read_kernel(&event->fn_data.args[i].ptr_data, sizeof(event->fn_data.args[i].ptr_data), (void *) arg);
-        }
-    }
-
-    if (cfg->is_ret_str && retval) {
-        use_str = true;
-        (void) bpf_probe_read_kernel_str(&str->ret, sizeof(str->ret), (void *) retval);
-    }
-
-    if (use_str)
-        (void) bpf_map_update_elem(&btrace_strs, &event->session_id, str, BPF_ANY);
+    (void) bpf_map_update_elem(&btrace_args, &session_id, data, BPF_ANY);
 }
 
-static __noinline bool
-filter_fnarg(void *ctx)
+static __noinline void
+output_arg_data(void *ctx, struct btrace_arg_data *data, __u64 session_id)
 {
-    return ctx != NULL;
+    /* This function will be rewrote by Go totally. */
+    /* Keeping one line is to show in `btrace -d -p`. */
+    if (ctx) __output_arg_data(data, session_id);
 }
 
 #endif // __BTRACE_ARG_H_

@@ -78,10 +78,12 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 	lbrs := maps["btrace_lbrs"]
 	strs := maps["btrace_strs"]
 	pkts := maps["btrace_pkts"]
+	args := maps["btrace_args"]
 
 	var lbrData LbrData
 	var strData StrData
 	var pktData PktData
+	var argData ArgData
 
 	printRetval := mode == TracingModeExit
 	colorOutput := !noColorOutput
@@ -162,12 +164,16 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 
 		var targetName string
 		var funcProto *btf.Func
+		var funcArgs []funcArgumentOutput
 		var funcParams []FuncParamFlags
-		progInfo, isProg := progs.funcs[event.FuncIP]
-		if isProg {
+		var isRetStr bool
+
+		if progInfo, ok := progs.funcs[event.FuncIP]; ok {
 			targetName = progInfo.funcName + "[bpf]"
 			funcProto = progInfo.funcProto
+			funcArgs = progInfo.funcArgs
 			funcParams = progInfo.funcParams
+			isRetStr = progInfo.isRetStr
 		} else {
 			ksym, ok := ksyms.find(event.FuncIP)
 			if ok {
@@ -179,16 +185,26 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			fn, ok := kfuncs[event.FuncIP]
 			if ok {
 				funcProto = fn.Func
+				funcArgs = fn.Args
 				funcParams = fn.Prms
+				isRetStr = fn.IsRetStr
 			}
 		}
 
-		useStrData := false
-		for _, prm := range funcParams {
-			useStrData = useStrData || prm.IsStr
+		hasArgOutput := len(funcArgs) != 0
+		if hasArgOutput {
+			b := ptr2bytes(unsafe.Pointer(&argData), int(unsafe.Sizeof(argData)))
+			err := args.LookupAndDelete(event.SessID, b)
+			if err != nil && !errors.Is(err, ebpf.ErrKeyNotExist) {
+				return fmt.Errorf("failed to lookup arg data: %w", err)
+			}
 		}
-		if !useStrData && funcProto != nil && btfx.IsStr(funcProto.Type.(*btf.FuncProto).Return) {
-			useStrData = true
+
+		useStrData := isRetStr
+		if !useStrData {
+			for _, prm := range funcParams {
+				useStrData = useStrData || prm.IsStr
+			}
 		}
 		if useStrData {
 			b := ptr2bytes(unsafe.Pointer(&strData), int(unsafe.Sizeof(strData)))
@@ -275,6 +291,11 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 		if hasPktTuple {
 			fmt.Fprint(&sb, "Pkt tuple: ")
 			color.New(color.FgGreen).Fprintln(&sb, pktData.repr())
+		}
+
+		if hasArgOutput {
+			fmt.Fprint(&sb, "Arg attrs: ")
+			argData.repr(&sb, funcArgs, ksyms)
 		}
 
 		if hasLbrEntries {

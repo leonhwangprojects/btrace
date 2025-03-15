@@ -81,21 +81,6 @@ func IsConst(t btf.Type) bool {
 	}
 }
 
-func IsStr(t btf.Type) bool {
-	ptr, ok := t.(*btf.Pointer)
-	if !ok {
-		return false
-	}
-
-	cnst, ok := ptr.Target.(*btf.Const)
-	if !ok {
-		return false
-	}
-
-	i, ok := cnst.Type.(*btf.Int)
-	return ok && i.Name == "char"
-}
-
 func IsFuncPtr(t btf.Type) bool {
 	t = mybtf.UnderlyingType(t)
 	ptr, ok := t.(*btf.Pointer)
@@ -195,7 +180,7 @@ loop:
 		fmt.Fprint(&sb, "float")
 
 	case *btf.Array:
-		fmt.Fprintf(&sb, "array(%s)[%d]", Repr(v.Type), v.Nelems)
+		fmt.Fprintf(&sb, "array(%s[%d])", Repr(v.Type), v.Nelems)
 
 	default:
 		fmt.Fprintf(&sb, "%v", t)
@@ -322,34 +307,29 @@ func ReprValue(t btf.Type, val, valNext uint64, find findSymbol) string {
 	return sb.String()
 }
 
-func ReprFuncParam(param *btf.FuncParam, i int, isStr, isNumberPtr bool, data, data2, dataNext uint64, s string, f findSymbol) string {
+func ReprValueType(name string, t btf.Type, isStr, isNumberPtr bool, data, data2, dataNext uint64, s string, f findSymbol) string {
 	var sb strings.Builder
 
-	typ := param.Type
-	fmt.Fprintf(&sb, "(%v)", Repr(typ))
+	fmt.Fprintf(&sb, "(%v)%s=", Repr(t), name)
 
-	size, err := btf.Sizeof(typ)
-	if err != nil {
-		fmt.Fprintf(&sb, "arg[%d]=..ERR..", i)
-		return sb.String()
-	}
-
-	fmt.Fprint(&sb, param.Name, "=")
-
-	if size == 8 && (isStr || isNumberPtr) {
-		if isStr {
-			fmt.Fprintf(&sb, "\"%s\"", s)
-		} else if data != 0 {
-			typ = mybtf.UnderlyingType(typ).(*btf.Pointer).Target
-			fmt.Fprintf(&sb, "%#x(%s)", data, ReprValue(typ, data2, dataNext, f))
+	if isStr {
+		fmt.Fprintf(&sb, "\"%s\"", s)
+	} else if isNumberPtr {
+		if data != 0 {
+			t = mybtf.UnderlyingType(t).(*btf.Pointer).Target
+			fmt.Fprintf(&sb, "%#x(%s)", data, ReprValue(t, data2, dataNext, f))
 		} else {
 			fmt.Fprintf(&sb, "%#x", data)
 		}
 	} else {
-		fmt.Fprint(&sb, ReprValue(typ, data, dataNext, f))
+		fmt.Fprint(&sb, ReprValue(t, data, dataNext, f))
 	}
 
 	return sb.String()
+}
+
+func ReprFuncParam(param *btf.FuncParam, i int, isStr, isNumberPtr bool, data, data2, dataNext uint64, s string, f findSymbol) string {
+	return ReprValueType(param.Name, param.Type, isStr, isNumberPtr, data, data2, dataNext, s, f)
 }
 
 func ReprFuncReturn(typ btf.Type, val int64, s string, f findSymbol) string {
@@ -358,7 +338,7 @@ func ReprFuncReturn(typ btf.Type, val int64, s string, f findSymbol) string {
 		return "(void)"
 	}
 
-	if IsStr(typ) && s != "" {
+	if mybtf.IsConstCharPtr(typ) {
 		return fmt.Sprintf("\"%s\"", s)
 	}
 
