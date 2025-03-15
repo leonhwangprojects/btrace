@@ -6,7 +6,7 @@ toolchain go1.24.0
 
 require (
 	github.com/Asphaltt/addr2line v0.1.1
-	github.com/Asphaltt/mybtf v0.0.0-20250313140353-0c2e5e870741
+	github.com/Asphaltt/mybtf v0.0.0-20250315135407-f9d09086616b
 	github.com/cilium/ebpf v0.17.4-0.20250310175843-23a70a77897a
 	github.com/fatih/color v1.18.0
 	github.com/gobwas/glob v0.2.3
@@ -14,7 +14,7 @@ require (
 	github.com/jschwinger233/elibpcap v1.0.0
 	github.com/klauspost/compress v1.17.11
 	github.com/knightsc/gapstone v4.0.1+incompatible
-	github.com/leonhwangprojects/bice v0.1.1-0.20250308142816-dd8e1a9f066d
+	github.com/leonhwangprojects/bice v0.1.1-0.20250315142656-b1a2ad832311
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
 	golang.org/x/sync v0.8.0

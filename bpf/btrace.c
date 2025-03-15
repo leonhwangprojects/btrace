@@ -6,6 +6,7 @@
 #include "bpf_map_helpers.h"
 
 #include "btrace.h"
+#include "btrace_arg.h"
 #include "btrace_lbr.h"
 #include "btrace_str.h"
 #include "btrace_pkt_filter.h"
@@ -61,6 +62,7 @@ emit_btrace_event(void *ctx)
     struct btrace_lbr_data *lbr;
     struct btrace_str_data *str;
     struct btrace_pkt_data *pkt;
+    struct btrace_arg_data *arg;
     struct event *evt;
     __u64 session_id;
     size_t event_sz;
@@ -74,6 +76,7 @@ emit_btrace_event(void *ctx)
     lbr = &btrace_lbr_buff[cpu];
     pkt = &btrace_pkt_buff[cpu];
     str = &btrace_str_buff[cpu];
+    arg = &btrace_arg_buff[cpu];
     evt = &btrace_evt_buff[cpu];
 
     if (cfg->output_lbr)
@@ -106,6 +109,8 @@ emit_btrace_event(void *ctx)
         output_lbr_data(lbr, session_id);
     if (cfg->output_pkt)
         output_pkt_tuple(ctx, pkt, session_id);
+    if (cfg->output_arg)
+        output_arg_data(ctx, arg, session_id);
 
     event_sz  = offsetof(struct event, fn_data);
     event_sz += sizeof(struct btrace_fn_arg_data) * cfg->fn_args.nr_fn_args;
