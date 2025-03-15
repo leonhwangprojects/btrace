@@ -131,7 +131,7 @@ func main() {
 	}
 
 	tstarted := time.Now()
-	tracings, err := btrace.NewBPFTracing(bpfSpec, reusedMaps, tracingTargets, kfuncs)
+	tracings, err := btrace.NewBPFTracing(bpfSpec, reusedMaps, bpfProgs, kfuncs)
 	assert.NoVerifierErr(err, "Failed to trace: %v")
 	btrace.DebugLog("Tracing %d tracees cost %s", len(tracings.Progs()), time.Since(tstarted))
 	var tended time.Time

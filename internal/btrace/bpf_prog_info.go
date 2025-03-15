@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Asphaltt/mybtf"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
 )
@@ -25,6 +26,8 @@ type bpfProgFuncInfo struct {
 	funcName   string
 	funcProto  *btf.Func
 	funcParams []FuncParamFlags
+	funcArgs   []funcArgumentOutput
+	isRetStr   bool
 
 	jitedLineInfo []uintptr        // ordered
 	lineInfos     []btf.LineOffset // mapping 1:1 with jitedLineInfo
@@ -111,6 +114,7 @@ func newBPFProgInfo(prog *ebpf.Program) (*bpfProgInfo, error) {
 		info.funcName = strings.TrimSpace(funcInfos[i].Func.Name)
 		info.funcProto = funcInfos[i].Func
 		info.funcParams, _ /* won't fail for bpf progs */ = getFuncParams(funcInfos[i].Func)
+		info.isRetStr = mybtf.IsConstCharPtr(funcInfos[i].Func.Type.(*btf.FuncProto).Return)
 
 		for i, kaddr := range jitedLineInfos {
 			if info.kaddrRange.start <= uintptr(kaddr) && uintptr(kaddr) < info.kaddrRange.end {

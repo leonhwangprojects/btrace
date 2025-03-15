@@ -21,6 +21,7 @@ var (
 	mode              string
 	filterArg         []string
 	filterPkt         string
+	outputArg         []string
 
 	outputLbr       bool
 	outputFuncStack bool
@@ -62,6 +63,7 @@ func ParseFlags() (*Flags, error) {
 	f.BoolVar(&outputPkt, "output-pkt", false, "output packet's tuple info if tracee has skb/xdp argument")
 	f.Uint32Var(&filterPid, "filter-pid", 0, "filter pid for tracing")
 	f.StringSliceVar(&filterArg, "filter-arg", nil, "filter function's argument with C expression, e.g. 'prog->type == BPF_PROG_TYPE_TRACING'")
+	f.StringSliceVar(&outputArg, "output-arg", nil, "output function's argument with C expression, e.g. 'prog->type'")
 	f.StringVar(&filterPkt, "filter-pkt", "", "filter packet with pcap-filter(7) expr if function argument is skb or xdp, e.g. 'icmp and host 1.1.1.1'")
 	f.UintVar(&limitEvents, "limit-events", 0, "limited number events to output, 0 to output all events")
 	f.BoolVar(&flags.showFuncProto, "show-func-proto", false, "show function prototype of -p,-k")
@@ -71,7 +73,8 @@ func ParseFlags() (*Flags, error) {
 	err := f.Parse(os.Args)
 
 	noColorOutput = flags.outputFile != "" || !isatty(os.Stdout.Fd())
-	fnArgs = prepareFuncArguments(filterArg)
+	argFilter = prepareFuncArguments(filterArg)
+	argOutput = prepareFuncArgOutput(outputArg)
 	pktFilter = preparePacketFilter(filterPkt)
 
 	return &flags, err

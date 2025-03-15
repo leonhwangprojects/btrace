@@ -9,8 +9,6 @@ import (
 
 	"github.com/Asphaltt/mybtf"
 	"github.com/cilium/ebpf/btf"
-
-	"github.com/leonhwangprojects/btrace/internal/btfx"
 )
 
 const (
@@ -30,6 +28,7 @@ type FuncParamFlags struct {
 type KFunc struct {
 	Ksym     *KsymEntry
 	Func     *btf.Func
+	Args     []funcArgumentOutput
 	Prms     []FuncParamFlags
 	IsRetStr bool
 }
@@ -43,7 +42,7 @@ func isValistParam(p btf.FuncParam) bool {
 	return p.Name == "" && isVoid
 }
 
-type KFuncs map[uintptr]KFunc
+type KFuncs map[uintptr]*KFunc
 
 func findKernelFuncs(funcs []string, ksyms *Kallsyms, maxArgs int, findManyArgs, silent bool) (KFuncs, error) {
 	matches, err := kfuncFlags2matches(funcs)
@@ -96,8 +95,8 @@ func findKernelFuncs(funcs []string, ksyms *Kallsyms, maxArgs int, findManyArgs,
 				if MAX_BPF_FUNC_ARGS_PREV < len(funcProto.Params) && len(funcProto.Params) <= MAX_BPF_FUNC_ARGS {
 					kf := KFunc{Ksym: ksym, Func: fn}
 					kf.Prms = params
-					kf.IsRetStr = btfx.IsStr(funcProto.Return)
-					kfuncs[uintptr(ksym.addr)] = kf
+					kf.IsRetStr = mybtf.IsConstCharPtr(funcProto.Return)
+					kfuncs[uintptr(ksym.addr)] = &kf
 				}
 				continue
 			}
@@ -105,8 +104,8 @@ func findKernelFuncs(funcs []string, ksyms *Kallsyms, maxArgs int, findManyArgs,
 			if len(funcProto.Params) <= maxArgs {
 				kf := KFunc{Ksym: ksym, Func: fn}
 				kf.Prms = params
-				kf.IsRetStr = btfx.IsStr(funcProto.Return)
-				kfuncs[uintptr(ksym.addr)] = kf
+				kf.IsRetStr = mybtf.IsConstCharPtr(funcProto.Return)
+				kfuncs[uintptr(ksym.addr)] = &kf
 			} else {
 				verboseLogIf(!silent, "Skip function %s with %d args because of limit %d args\n",
 					fn.Name, len(funcProto.Params), maxArgs)

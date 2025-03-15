@@ -35,6 +35,7 @@ func setBtraceConfig(spec *ebpf.CollectionSpec, args []FuncParamFlags, isRetStr 
 	cfg.SetOutputLbr(outputLbr)
 	cfg.SetOutputStack(outputFuncStack)
 	cfg.SetOutputPktTuple(outputPkt)
+	cfg.SetOutputArgData(len(argOutput.args) != 0)
 	cfg.SetIsRetStr(isRetStr)
 	cfg.FilterPid = filterPid
 	cfg.FnArgsNr = uint32(len(args))
@@ -49,16 +50,16 @@ func setBtraceConfig(spec *ebpf.CollectionSpec, args []FuncParamFlags, isRetStr 
 	return nil
 }
 
-func NewBPFTracing(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, infos []bpfTracingInfo, kfuncs KFuncs) (*bpfTracing, error) {
+func NewBPFTracing(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, bprogs *bpfProgs, kfuncs KFuncs) (*bpfTracing, error) {
 	var t bpfTracing
-	t.links = make([]link.Link, 0, len(infos))
+	t.links = make([]link.Link, 0, len(bprogs.tracings))
 
 	var errg errgroup.Group
 
-	for _, info := range infos {
+	for _, info := range bprogs.tracings {
 		info := info
 		errg.Go(func() error {
-			return t.traceProg(spec, reusedMaps, info)
+			return t.traceProg(spec, reusedMaps, info, bprogs)
 		})
 	}
 
@@ -113,8 +114,8 @@ func TracingProgName(mode string) string {
 	return fmt.Sprintf("f%s_fn", mode)
 }
 
-func (t *bpfTracing) injectFnArg(prog *ebpf.ProgramSpec, params []btf.FuncParam, fnName string) error {
-	if len(fnArgs) == 0 {
+func (t *bpfTracing) injectArgFilter(prog *ebpf.ProgramSpec, params []btf.FuncParam, fnName string) error {
+	if len(argFilter) == 0 {
 		return nil
 	}
 
@@ -135,6 +136,23 @@ func (t *bpfTracing) injectFnArg(prog *ebpf.ProgramSpec, params []btf.FuncParam,
 	}
 
 	return nil
+}
+
+func (t *bpfTracing) injectArgOutput(prog *ebpf.ProgramSpec, params []btf.FuncParam, checkArgType bool, fnName string) ([]funcArgumentOutput, error) {
+	if len(argOutput.args) == 0 {
+		return nil, nil
+	}
+
+	args, err := argOutput.matchParams(params, checkArgType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to match params: %w", err)
+	}
+
+	argOutput.inject(prog, args)
+
+	DebugLog("Injected --output-arg expr to func %s", fnName)
+
+	return args, nil
 }
 
 func (t *bpfTracing) injectSkbFilter(prog *ebpf.ProgramSpec, index int, typ btf.Type) error {
@@ -234,7 +252,7 @@ func (t *bpfTracing) injectPktOutput(prog *ebpf.ProgramSpec, params []btf.FuncPa
 	}
 }
 
-func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, info bpfTracingInfo) error {
+func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, info bpfTracingInfo, bprogs *bpfProgs) error {
 	spec = spec.Copy()
 
 	if err := setBtraceConfig(spec, info.params, false); err != nil {
@@ -246,12 +264,17 @@ func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]
 	progSpec := spec.Programs[tracingFuncName]
 	params := info.fn.Type.(*btf.FuncProto).Params
 	t.injectPktOutput(progSpec, params, traceeName)
-	if err := t.injectFnArg(progSpec, params, traceeName); err != nil {
-		return err
-	}
 	if err := t.injectPktFilter(progSpec, params, traceeName); err != nil {
 		return err
 	}
+	if err := t.injectArgFilter(progSpec, params, traceeName); err != nil {
+		return err
+	}
+	args, err := t.injectArgOutput(progSpec, params, true, traceeName)
+	if err != nil {
+		return err
+	}
+	bprogs.funcs[info.funcIP].funcArgs = args
 
 	attachType := ebpf.AttachTraceFExit
 	if mode == TracingModeEntry {
@@ -292,7 +315,7 @@ func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]
 	return nil
 }
 
-func (t *bpfTracing) traceFunc(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, fn KFunc) error {
+func (t *bpfTracing) traceFunc(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, fn *KFunc) error {
 	spec = spec.Copy()
 
 	if err := setBtraceConfig(spec, fn.Prms, fn.IsRetStr); err != nil {
@@ -304,12 +327,17 @@ func (t *bpfTracing) traceFunc(spec *ebpf.CollectionSpec, reusedMaps map[string]
 	progSpec := spec.Programs[tracingFuncName]
 	params := fn.Func.Type.(*btf.FuncProto).Params
 	t.injectPktOutput(progSpec, params, traceeName)
-	if err := t.injectFnArg(progSpec, params, traceeName); err != nil {
-		return err
-	}
 	if err := t.injectPktFilter(progSpec, params, traceeName); err != nil {
 		return err
 	}
+	if err := t.injectArgFilter(progSpec, params, traceeName); err != nil {
+		return err
+	}
+	args, err := t.injectArgOutput(progSpec, params, false, traceeName)
+	if err != nil {
+		return err
+	}
+	fn.Args = args
 
 	attachType := ebpf.AttachTraceFExit
 	if mode == TracingModeEntry {
