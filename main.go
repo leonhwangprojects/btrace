@@ -140,10 +140,6 @@ func main() {
 	defer func() { tended = time.Now() }()
 	assert.True(tracings.HaveTracing(), "No tracing target")
 
-	btrace.DebugLog("Current pid is %d", os.Getpid())
-	err = bpfSpec.Variables["PID"].Set(uint32(os.Getpid()))
-	assert.NoErr(err, "Failed to set PID: %v")
-
 	err = bpfProgs.AddProgs(tracings.Progs(), true)
 	assert.NoErr(err, "Failed to add bpf progs: %v")
 
