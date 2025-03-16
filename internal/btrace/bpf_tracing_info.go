@@ -68,8 +68,22 @@ func getProgFunc(fns btf.FuncOffsets, funcName string) (int, error) {
 	return -1, fmt.Errorf("failed to find func %s", funcName)
 }
 
+func (p *bpfProgs) canTrace(prog *ebpf.Program, id ebpf.ProgramID) bool {
+	if prog.Type() != ebpf.Tracing {
+		return true
+	}
+
+	link, ok := p.links.links[id]
+	if !ok {
+		return true
+	}
+
+	return link.attachType != ebpf.AttachTraceFEntry &&
+		link.attachType != ebpf.AttachTraceFExit
+}
+
 func (p *bpfProgs) addTracing(id ebpf.ProgramID, funcName string, prog *ebpf.Program) error {
-	if prog.Type() == ebpf.Tracing && !p.disasm {
+	if !p.canTrace(prog, id) && !p.disasm {
 		return nil
 	}
 
