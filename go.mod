@@ -14,7 +14,7 @@ require (
 	github.com/jschwinger233/elibpcap v1.0.0
 	github.com/klauspost/compress v1.17.11
 	github.com/knightsc/gapstone v4.0.1+incompatible
-	github.com/leonhwangprojects/bice v0.1.1-0.20250315142656-b1a2ad832311
+	github.com/leonhwangprojects/bice v0.1.1
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
 	golang.org/x/sync v0.8.0
