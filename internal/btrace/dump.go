@@ -55,7 +55,7 @@ func DumpProg(pf []ProgFlag) {
 
 		VerboseLog("Creating addr2line from vmlinux ..")
 		kaslr := NewKaslr(kallsyms.Stext(), textAddr)
-		addr2line, err = NewAddr2Line(vmlinux, kaslr, kallsyms.SysBPF())
+		addr2line, err = NewAddr2Line(vmlinux, kaslr, kallsyms.SysBPF(), kallsyms.Stext())
 		assert.NoErr(err, "Failed to create addr2line: %v")
 	}
 

@@ -103,7 +103,7 @@ func main() {
 
 		btrace.VerboseLog("Creating addr2line from vmlinux ..")
 		kaslr := btrace.NewKaslr(kallsyms.Stext(), textAddr)
-		addr2line, err = btrace.NewAddr2Line(vmlinux, kaslr, kallsyms.SysBPF())
+		addr2line, err = btrace.NewAddr2Line(vmlinux, kaslr, kallsyms.SysBPF(), kallsyms.Stext())
 		assert.NoErr(err, "Failed to create addr2line: %v")
 	}
 

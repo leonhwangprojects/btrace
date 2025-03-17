@@ -1,5 +1,5 @@
-github.com/Asphaltt/addr2line v0.1.1 h1:eYkAgT9clEjzYMVeTY3dF0dFjX5gc97yWuoGHmvqAYc=
-github.com/Asphaltt/addr2line v0.1.1/go.mod h1:02z/FcEJ9rsH1i7It81L6xHtjSoBOrKbDtTGlptzfP0=
+github.com/Asphaltt/addr2line v0.1.2 h1:GPZflkxPeF+7EKXt9ty8GDwBhd7tVxQilUkCHI/4Ujg=
+github.com/Asphaltt/addr2line v0.1.2/go.mod h1:02z/FcEJ9rsH1i7It81L6xHtjSoBOrKbDtTGlptzfP0=
 github.com/Asphaltt/gapstone v0.0.0-20241029140935-c5412a26abf7 h1:z1Ohf61MSfgVMxAs2Z4nWZ4p+a12K/u41JJurdIxdBU=
 github.com/Asphaltt/gapstone v0.0.0-20241029140935-c5412a26abf7/go.mod h1:1K5hEzsMBLTPdRJKEHqBFJ8Zt2VRqDhomcQ11KH0WW4=
 github.com/Asphaltt/mybtf v0.0.0-20250315135407-f9d09086616b h1:LRS0ckDlNnX2Bux8k0HqLVf/2PqvvykoB8HSxXf7XjA=

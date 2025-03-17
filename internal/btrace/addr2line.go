@@ -35,12 +35,13 @@ type Addr2Line struct {
 	kmods   map[string]kmodAddr2line
 	cache   *lru.Cache[uintptr, *addr2line.Addr2LineEntry]
 
+	stext    uint64
 	kaslr    Kaslr
 	buildDir string
 }
 
 // NewAddr2Line creates a new Addr2Line instance from the given vmlinux file.
-func NewAddr2Line(vmlinux string, kaslr Kaslr, sysBPF uint64) (*Addr2Line, error) {
+func NewAddr2Line(vmlinux string, kaslr Kaslr, sysBPF, stext uint64) (*Addr2Line, error) {
 	a2l, err := addr2line.New(vmlinux)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create addr2line from %s: %w", vmlinux, err)
@@ -66,6 +67,7 @@ func NewAddr2Line(vmlinux string, kaslr Kaslr, sysBPF uint64) (*Addr2Line, error
 		kmods:   make(map[string]kmodAddr2line),
 		cache:   cache,
 
+		stext:    stext,
 		kaslr:    kaslr,
 		buildDir: buildDir,
 	}, nil
@@ -181,29 +183,17 @@ func findSymbolInKmod(modKo, symbol string) (*elf.Symbol, error) {
 	return nil, ErrNotFound
 }
 
-func (a2l *Addr2Line) getMod(ksym *KsymEntry) (*addr2line.Addr2Line, Kaslr, error) {
-	if ksym == nil || isKernelBuiltinMod(ksym.mod) {
-		return a2l.a2l, a2l.kaslr, nil
-	}
-
+func (a2l *Addr2Line) addKmod(modName string) error {
 	var modKo string
 
-	modName := ksym.mod
 	kmod, ok := a2l.kmods[modName]
 	if ok {
-		return kmod.Addr2Line, kmod.kaslr, nil
+		return nil
 	}
 
 	modKo, err := findKernelModuleFile(modName)
-	if errors.Is(err, ErrNotFound) {
-		kmod = kmodAddr2line{}
-		kmod.Addr2Line = nil
-		kmod.kaslr = Kaslr{}
-		a2l.kmods[modName] = kmod // cache the not-found result
-		return nil, Kaslr{}, nil
-	}
 	if err != nil {
-		return nil, Kaslr{}, fmt.Errorf("failed to find %s: %w", modName, err)
+		return fmt.Errorf("failed to find %s: %w", modName, err)
 	}
 
 	VerboseLog("Found %s at %s", modName, modKo)
@@ -212,13 +202,13 @@ func (a2l *Addr2Line) getMod(ksym *KsymEntry) (*addr2line.Addr2Line, Kaslr, erro
 	if strings.HasSuffix(modKo, ".ko.zst") {
 		fd, err := os.Open(modKo)
 		if err != nil {
-			return nil, Kaslr{}, fmt.Errorf("failed to open file %s: %w", modKo, err)
+			return fmt.Errorf("failed to open file %s: %w", modKo, err)
 		}
 		defer fd.Close()
 
 		r, err := zst2readerAt(fd)
 		if err != nil {
-			return nil, Kaslr{}, fmt.Errorf("failed to create zstd reader for %s: %w", modKo, err)
+			return fmt.Errorf("failed to create zstd reader for %s: %w", modKo, err)
 		}
 
 		li, err = addr2line.NewAt(r, modKo)
@@ -232,19 +222,45 @@ func (a2l *Addr2Line) getMod(ksym *KsymEntry) (*addr2line.Addr2Line, Kaslr, erro
 		}
 	}
 
-	sym, err := findSymbolInKmod(modKo, ksym.name)
+	sym, err := findSymbolInKmod(modKo, ".text")
 	if err != nil {
-		return nil, Kaslr{}, fmt.Errorf("failed to find symbol %s in %s: %w", ksym.name, modKo, err)
+		return fmt.Errorf("failed to find symbol .text in %s: %w", modKo, err)
 	}
 
 	kmod = kmodAddr2line{}
 	kmod.Addr2Line = li
-	kmod.kaslr = NewKaslr(ksym.addr, sym.Value)
+	kmod.kaslr = NewKaslr(a2l.stext, sym.Value)
 
 	a2l.kmods[modName] = kmod
 
-	kaslr := kmod.kaslr
-	return kmod.Addr2Line, kaslr, nil
+	return nil
+}
+
+func (a2l *Addr2Line) getMod(ksym *KsymEntry) (*addr2line.Addr2Line, Kaslr, error) {
+	if ksym == nil || isKernelBuiltinMod(ksym.mod) {
+		return a2l.a2l, a2l.kaslr, nil
+	}
+
+	modName := ksym.mod
+	kmod, ok := a2l.kmods[modName]
+	if ok {
+		return kmod.Addr2Line, kmod.kaslr, nil
+	}
+
+	err := a2l.addKmod(modName)
+	if errors.Is(err, ErrNotFound) {
+		kmod := kmodAddr2line{}
+		kmod.Addr2Line = nil
+		kmod.kaslr = Kaslr{}
+		a2l.kmods[modName] = kmod // cache the not-found result
+		return nil, Kaslr{}, nil
+	}
+	if err != nil {
+		return nil, Kaslr{}, fmt.Errorf("failed to find %s: %w", modName, err)
+	}
+
+	kmod = a2l.kmods[modName]
+	return kmod.Addr2Line, kmod.kaslr, nil
 }
 
 // get returns the addr2line entry from the vmlinux file for the given address.

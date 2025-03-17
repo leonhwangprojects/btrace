@@ -38,7 +38,7 @@ func Disasm(f *Flags) {
 	if len(f.kfuncs) != 0 {
 		assert.SliceLen(f.kfuncs, 1, "Only one --kfunc is allowed for --disasm")
 
-		dumpKfunc(f.kfuncs[0], f.disasmBytes)
+		dumpKfunc(f.kfuncs[0], kfuncKmods, f.disasmBytes)
 		return
 	}
 }
@@ -92,40 +92,12 @@ func trimTailingInsns(b []byte) []byte {
 	return b[:i+1]
 }
 
-func dumpKfunc(kfunc string, bytes uint) {
+func dumpKfunc(kfunc string, kmods []string, bytes uint) {
 	assert.True(runtime.GOARCH == "amd64", "Only support amd64 arch")
 
 	VerboseLog("Reading /proc/kallsyms ..")
 	kallsyms, err := NewKallsyms()
 	assert.NoErr(err, "Failed to read /proc/kallsyms: %v")
-
-	var kaddr uint64
-	if !strings.HasPrefix(kfunc, "0x") {
-		kaddr, err = strconv.ParseUint("0x"+kfunc, 0, 64)
-	} else {
-		kaddr, err = strconv.ParseUint(kfunc, 0, 64)
-	}
-	if err != nil {
-		// kfunc may be a symbol name
-		entry, ok := kallsyms.findBySymbol(kfunc)
-		assert.True(ok, "Symbol %s not found in /proc/kallsyms", kfunc)
-
-		kaddr = entry.addr
-		kfunc = entry.name
-	} else {
-		entry, ok := kallsyms.find(uintptr(kaddr))
-		assert.True(ok, "Address %#x not found in /proc/kallsyms", kaddr)
-
-		kfunc = entry.name
-	}
-
-	bytes = guessBytes(uintptr(kaddr), kallsyms, bytes)
-	data, ok := readKcore(kaddr, bytes)
-	assert.True(ok, "Failed to read kcore for %s", kfunc)
-	data = trimTailingInsns(data)
-	log.Printf("Disassembling %s at %s (%d bytes) ..",
-		color.New(color.FgYellow, color.Bold).Sprint(kfunc),
-		color.New(color.FgBlue).Sprintf("%#x", kaddr), len(data))
 
 	var addr2line *Addr2Line
 
@@ -145,9 +117,77 @@ func dumpKfunc(kfunc string, bytes uint) {
 
 		VerboseLog("Creating addr2line from vmlinux ..")
 		kaslr := NewKaslr(kallsyms.Stext(), textAddr)
-		addr2line, err = NewAddr2Line(vmlinux, kaslr, kallsyms.SysBPF())
+		addr2line, err = NewAddr2Line(vmlinux, kaslr, kallsyms.SysBPF(), kallsyms.Stext())
 		assert.NoErr(err, "Failed to create addr2line: %v")
 	}
+
+	var kaddr uint64
+	if !strings.HasPrefix(kfunc, "0x") {
+		kaddr, err = strconv.ParseUint("0x"+kfunc, 0, 64)
+	} else {
+		kaddr, err = strconv.ParseUint(kfunc, 0, 64)
+	}
+	if err != nil {
+		// kfunc may be a symbol name
+		entry, ok := kallsyms.findBySymbol(kfunc)
+		if !ok {
+			VerboseLog("Symbol %s not found in /proc/kallsyms", kfunc)
+
+			if addr2line == nil {
+				log.Fatal("Dbgsym is required to disasm %s", kfunc)
+			}
+
+			for _, kmodName := range kmods {
+				err := addr2line.addKmod(kmodName)
+				assert.NoErr(err, "Failed to parse addr2line of kmod %s: %w", kmodName, err)
+
+				kmod := addr2line.kmods[kmodName]
+				entry, err := kmod.Addr2Line.FindBySymbol(kfunc)
+				if err == nil {
+					kaddr = kmod.kaslr.revertAddr(entry.Address)
+					break
+				}
+			}
+
+			assert.False(kaddr == 0, "Symbol %s not found", kfunc)
+		} else {
+			kaddr = entry.addr
+			kfunc = entry.name
+		}
+	} else {
+		entry, ok := kallsyms.find(uintptr(kaddr))
+		if !ok {
+			VerboseLog("Address %#x not found in /proc/kallsyms", kaddr)
+
+			if addr2line == nil {
+				log.Fatal("Dbgsym is required to disasm %s", kfunc)
+			}
+
+			for _, kmodName := range kmods {
+				err := addr2line.addKmod(kmodName)
+				assert.NoErr(err, "Failed to parse addr2line of kmod %s: %w", kmodName, err)
+
+				kmod := addr2line.kmods[kmodName]
+				entry, err := kmod.Addr2Line.Get(kaddr, true)
+				if err == nil {
+					kaddr = kmod.kaslr.revertAddr(entry.Address)
+					break
+				}
+			}
+
+			assert.False(kaddr == 0, "Symbol %s not found", kfunc)
+		} else {
+			kfunc = entry.name
+		}
+	}
+
+	bytes = guessBytes(uintptr(kaddr), kallsyms, bytes)
+	data, ok := readKcore(kaddr, bytes)
+	assert.True(ok, "Failed to read kcore for %s", kfunc)
+	data = trimTailingInsns(data)
+	log.Printf("Disassembling %s at %s (%d bytes) ..",
+		color.New(color.FgYellow, color.Bold).Sprint(kfunc),
+		color.New(color.FgBlue).Sprintf("%#x", kaddr), len(data))
 
 	engine, err := gapstone.New(int(gapstone.CS_ARCH_X86), int(gapstone.CS_MODE_64))
 	assert.NoErr(err, "Failed to create engine: %v")

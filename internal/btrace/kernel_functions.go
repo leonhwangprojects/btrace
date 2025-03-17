@@ -6,6 +6,7 @@ package btrace
 import (
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/Asphaltt/mybtf"
 	"github.com/cilium/ebpf/btf"
@@ -20,6 +21,7 @@ type ParamFlags struct {
 	IsNumberPtr bool
 	IsStr       bool
 }
+
 type FuncParamFlags struct {
 	ParamFlags
 	partOfPrevParam bool
@@ -121,6 +123,20 @@ func findKernelFuncs(funcs []string, ksyms *Kallsyms, maxArgs int, findManyArgs,
 
 		for _, file := range files {
 			kmodBtf, err := btf.LoadKernelModuleSpec(file.Name())
+			if err != nil {
+				return nil, fmt.Errorf("failed to load kernel module BTF: %w", err)
+			}
+
+			iterBtfSpec(kmodBtf)
+		}
+	} else if len(kfuncKmods) != 0 {
+		kmods := slices.Clone(kfuncKmods)
+		kmods = append(kmods, "vmlinux")
+		slices.Sort(kmods)
+		kmods = slices.Compact(kmods)
+
+		for _, kmod := range kmods {
+			kmodBtf, err := btf.LoadKernelModuleSpec(kmod)
 			if err != nil {
 				return nil, fmt.Errorf("failed to load kernel module BTF: %w", err)
 			}

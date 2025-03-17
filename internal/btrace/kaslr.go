@@ -19,6 +19,14 @@ func (k *Kaslr) effectiveAddr(kaddr uint64) uint64 {
 	return uint64(kaddr + (k.saddr - k.kaddr))
 }
 
+func (k *Kaslr) revertAddr(saddr uint64) uint64 {
+	if k.saddr < k.kaddr {
+		return saddr + (k.kaddr - k.saddr)
+	}
+
+	return saddr - (k.saddr - k.kaddr)
+}
+
 func (k *Kaslr) offset() uint64 {
 	if k.saddr < k.kaddr {
 		return k.kaddr - k.saddr
