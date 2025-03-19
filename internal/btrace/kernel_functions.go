@@ -17,6 +17,27 @@ const (
 	MAX_BPF_FUNC_ARGS_PREV = 6
 )
 
+// According to patch [bpf: Reject attaching fexit/fmod_ret to __noreturn functions](https://lore.kernel.org/bpf/20250318114447.75484-1-laoar.shao@gmail.com/),
+// the following functions cannot be traced by fexit.
+var noreturnFuncs = []string{
+	"__ia32_sys_exit",
+	"__ia32_sys_exit_group",
+
+	"__kunit_abort",
+	"kunit_try_catch_throw",
+
+	"__module_put_and_kthread_exit",
+
+	"__x64_sys_exit",
+	"__x64_sys_exit_group",
+
+	"do_exit",
+	"do_group_exit",
+	"kthread_complete_and_exit",
+	"kthread_exit",
+	"make_task_dead",
+}
+
 type ParamFlags struct {
 	IsNumberPtr bool
 	IsStr       bool
@@ -164,5 +185,20 @@ func FindKernelFuncs(funcs []string, ksyms *Kallsyms, maxArgs int) (KFuncs, erro
 		return KFuncs{}, nil
 	}
 
-	return findKernelFuncs(funcs, ksyms, maxArgs, false, false)
+	kfuncs, err := findKernelFuncs(funcs, ksyms, maxArgs, false, false)
+	if err != nil {
+		return nil, err
+	}
+
+	if mode != TracingModeExit {
+		return kfuncs, nil
+	}
+
+	for ptr, kf := range kfuncs {
+		if slices.Contains(noreturnFuncs, kf.Name()) {
+			delete(kfuncs, ptr)
+		}
+	}
+
+	return kfuncs, nil
 }
