@@ -23,10 +23,6 @@ import (
 	"github.com/leonhwangprojects/btrace/internal/btrace"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang btrace ./bpf/btrace.c -- -g -D__TARGET_ARCH_x86 -I./bpf -I./bpf/headers -I./lib/libbpf/src -Wall
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang feat ./bpf/feature.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -I./lib/libbpf/src -Wall
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang traceable ./bpf/traceable.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -I./lib/libbpf/src -Wall
-
 func main() {
 	flags, err := btrace.ParseFlags()
 	assert.NoErr(err, "Failed to parse flags: %v")
@@ -36,8 +32,11 @@ func main() {
 		return
 	}
 
+	tpSpec, err := loadTracepoint()
+	assert.NoErr(err, "Failed to load tracepoint bpf spec: %v")
+
 	if flags.ShowFuncProto() {
-		btrace.ShowFuncProto(flags)
+		btrace.ShowFuncProto(flags, tpSpec)
 		return
 	}
 
@@ -84,6 +83,11 @@ func main() {
 	btrace.VerboseLog("Detect %d kernel functions traceable ..", len(kfuncs))
 	kfuncs, err = btrace.DetectTraceable(traceableBPFSpec, kfuncs)
 	assert.NoVerifierErr(err, "Failed to detect traceable for kfuncs: %v")
+
+	ktps, err := btrace.FindKernelTracepoints(flags.Ktps(), tpSpec, kallsyms)
+	assert.NoVerifierErr(err, "Failed to detect tracepoints: %v")
+
+	btrace.MergeTracepointsToKfuncs(ktps, kfuncs)
 
 	var addr2line *btrace.Addr2Line
 

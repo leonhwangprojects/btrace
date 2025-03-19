@@ -26,11 +26,7 @@ func DetectSupportedMaxArg(traceableSpec, spec *ebpf.CollectionSpec, ksyms *Kall
 	}
 
 	spec = spec.Copy()
-	err = setBtraceConfig(spec, nil, false)
-	if err != nil {
-		return 0, fmt.Errorf("failed to set btrace config: %w", err)
-	}
-
+	delete(spec.Programs, TracingTpBtfProgName())
 	reusedMaps := PrepareBPFMaps(spec)
 	defer CloseBPFMaps(reusedMaps)
 

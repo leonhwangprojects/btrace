@@ -18,10 +18,22 @@ GOBUILD := go build -v -trimpath
 GOBUILD_CGO_CFLAGS := CGO_CFLAGS='-O2 -I$(CURDIR)/lib/capstone/include -I$(CURDIR)/lib/libpcap'
 GOBUILD_CGO_LDFLAGS := CGO_LDFLAGS='-O2 -g -L$(CURDIR)/lib/capstone/build -lcapstone -L$(CURDIR)/lib/libpcap -lpcap -static'
 
-GOGEN := go generate
+BPF2GO := go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -go-package main
+BPF2GO_EXTRA_FLAGS := -g -D__TARGET_ARCH_x86 -I./bpf -I./bpf/headers -I./lib/libbpf/src -Wno-address-of-packed-member -Wall
 
-BPF_OBJ := btrace_bpfel.o btrace_bpfeb.o feat_bpfel.o feat_bpfeb.o traceable_bpfel.o traceable_bpfeb.o
-BPF_SRC := $(wildcard bpf/*.c) $(wildcard bpf/*.h) $(wildcard bpf/headers/*.h)
+BTRACE_BPF_OBJ := btrace_bpfel.o btrace_bpfeb.o
+BTRACE_BPF_SRC := bpf/btrace.c $(wildcard bpf/*.h) $(wildcard bpf/headers/*.h)
+
+FEAT_BPF_OBJ := feat_bpfel.o feat_bpfeb.o
+FEAT_BPF_SRC := bpf/feature.c
+
+TRACEABLE_BPF_OBJ := traceable_bpfel.o traceable_bpfeb.o
+TRACEABLE_BPF_SRC := bpf/traceable.c
+
+TRACEPOINT_BPF_OBJ := tracepoint_bpfel.o tracepoint_bpfeb.o
+TRACEPOINT_BPF_SRC := bpf/tracepoint.c
+
+BPF_OBJS := $(BTRACE_BPF_OBJ) $(FEAT_BPF_OBJ) $(TRACEABLE_BPF_OBJ) $(TRACEPOINT_BPF_OBJ)
 
 BTRACE_OBJ := btrace
 BTRACE_SRC := $(shell find internal -type f -name '*.go') main.go
