@@ -248,12 +248,12 @@ func (arg *argDataOutput) injectArgs(args []funcArgumentOutput) asm.Instructions
 	)
 
 	for i, a := range args {
-		insns = append(insns, a.insn...)
 		if i != 0 {
 			insns = append(insns,
 				asm.Mov.Reg(asm.R1, asm.R8), // R1 = ctx
 			)
 		}
+		insns = append(insns, a.insn...)
 	}
 
 	insns = append(insns,
