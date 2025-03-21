@@ -12,6 +12,8 @@
 #include "bpfsnoop_pkt_filter.h"
 #include "bpfsnoop_pkt_output.h"
 
+volatile const __u32 PID = -1;
+
 __u32 ready SEC(".data.ready") = 0;
 
 #define MAX_STACK_DEPTH 50
@@ -87,6 +89,8 @@ emit_bpfsnoop_event(void *ctx)
      */
 
     pid = bpf_get_current_pid_tgid() >> 32;
+    if (pid == PID)
+        return BPF_OK;
     if (cfg->pid && pid != cfg->pid)
         return BPF_OK;
 

@@ -74,6 +74,9 @@ func main() {
 	assert.NoErr(err, "Failed to load bpf spec: %v")
 	delete(bpfSpec.Programs, bpfsnoop.TracingProgName(flags.OtherMode()))
 
+	err = bpfSpec.Variables["PID"].Set(uint32(os.Getpid()))
+	assert.NoErr(err, "Failed to set PID: %v")
+
 	maxArg, err := bpfsnoop.DetectSupportedMaxArg(traceableBPFSpec, bpfSpec, kallsyms)
 	assert.NoErr(err, "Failed to detect supported func max arg: %v")
 	bpfsnoop.VerboseLog("Max arg count limits to %d", maxArg)
@@ -163,6 +166,7 @@ func main() {
 	assert.NoErr(err, "Failed to update ready data map: %v")
 	defer readyData.Put(uint32(0), uint32(0))
 
+	bpfsnoop.DebugLog("bpfsnoop pid is %d", os.Getpid())
 	log.Print("bpfsnoop is running..")
 	defer log.Print("bpfsnoop is exiting..")
 
