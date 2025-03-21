@@ -26,7 +26,7 @@ go.work
 # Editors
 .vscode/
 
-/btrace
+/bpfsnoop
 /bpf/headers/vmlinux.h
 
 /bin/*

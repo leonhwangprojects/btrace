@@ -1,4 +1,4 @@
-module github.com/leonhwangprojects/btrace
+module github.com/bpfsnoop/bpfsnoop
 
 go 1.23.4
 

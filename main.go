@@ -19,30 +19,30 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
 
-	"github.com/leonhwangprojects/btrace/internal/assert"
-	"github.com/leonhwangprojects/btrace/internal/btrace"
+	"github.com/bpfsnoop/bpfsnoop/internal/assert"
+	"github.com/bpfsnoop/bpfsnoop/internal/bpfsnoop"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang btrace ./bpf/btrace.c -- -g -D__TARGET_ARCH_x86 -I./bpf -I./bpf/headers -I./lib/libbpf/src -Wall
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang bpfsnoop ./bpf/bpfsnoop.c -- -g -D__TARGET_ARCH_x86 -I./bpf -I./bpf/headers -I./lib/libbpf/src -Wall
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang feat ./bpf/feature.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -I./lib/libbpf/src -Wall
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang traceable ./bpf/traceable.c -- -g -D__TARGET_ARCH_x86 -I./bpf/headers -I./lib/libbpf/src -Wall
 
 func main() {
-	flags, err := btrace.ParseFlags()
+	flags, err := bpfsnoop.ParseFlags()
 	assert.NoErr(err, "Failed to parse flags: %v")
 
 	if flags.Disasm() {
-		btrace.Disasm(flags)
+		bpfsnoop.Disasm(flags)
 		return
 	}
 
 	if flags.ShowFuncProto() {
-		btrace.ShowFuncProto(flags)
+		bpfsnoop.ShowFuncProto(flags)
 		return
 	}
 
 	mode := flags.Mode()
-	assert.True(slices.Contains([]string{btrace.TracingModeEntry, btrace.TracingModeExit}, mode),
+	assert.True(slices.Contains([]string{bpfsnoop.TracingModeEntry, bpfsnoop.TracingModeExit}, mode),
 		fmt.Sprintf("Mode (%s) must be exit or entry", mode))
 
 	progs, err := flags.ParseProgs()
@@ -51,11 +51,11 @@ func main() {
 	featBPFSpec, err := loadFeat()
 	assert.NoErr(err, "Failed to load feat bpf spec: %v")
 
-	err = btrace.DetectBPFFeatures(featBPFSpec)
+	err = bpfsnoop.DetectBPFFeatures(featBPFSpec)
 	assert.NoVerifierErr(err, "Failed to detect bpf features: %v")
 
 	if flags.OutputLbr() {
-		lbrPerfEvents, err := btrace.OpenLbrPerfEvent()
+		lbrPerfEvents, err := bpfsnoop.OpenLbrPerfEvent()
 		if err != nil &&
 			(errors.Is(err, unix.ENOENT) || errors.Is(err, unix.EOPNOTSUPP)) {
 			log.Fatalln("LBR is not supported on current system")
@@ -64,46 +64,46 @@ func main() {
 		defer lbrPerfEvents.Close()
 	}
 
-	btrace.VerboseLog("Reading /proc/kallsyms ..")
-	kallsyms, err := btrace.NewKallsyms()
+	bpfsnoop.VerboseLog("Reading /proc/kallsyms ..")
+	kallsyms, err := bpfsnoop.NewKallsyms()
 	assert.NoErr(err, "Failed to read /proc/kallsyms: %v")
 
 	traceableBPFSpec, err := loadTraceable()
 	assert.NoErr(err, "Failed to load traceable bpf spec: %v")
-	bpfSpec, err := loadBtrace()
+	bpfSpec, err := loadBpfsnoop()
 	assert.NoErr(err, "Failed to load bpf spec: %v")
-	delete(bpfSpec.Programs, btrace.TracingProgName(flags.OtherMode()))
+	delete(bpfSpec.Programs, bpfsnoop.TracingProgName(flags.OtherMode()))
 
-	maxArg, err := btrace.DetectSupportedMaxArg(traceableBPFSpec, bpfSpec, kallsyms)
+	maxArg, err := bpfsnoop.DetectSupportedMaxArg(traceableBPFSpec, bpfSpec, kallsyms)
 	assert.NoErr(err, "Failed to detect supported func max arg: %v")
-	btrace.VerboseLog("Max arg count limits to %d", maxArg)
+	bpfsnoop.VerboseLog("Max arg count limits to %d", maxArg)
 
-	kfuncs, err := btrace.FindKernelFuncs(flags.Kfuncs(), kallsyms, maxArg)
+	kfuncs, err := bpfsnoop.FindKernelFuncs(flags.Kfuncs(), kallsyms, maxArg)
 	assert.NoErr(err, "Failed to find kernel functions: %v")
 
-	btrace.VerboseLog("Detect %d kernel functions traceable ..", len(kfuncs))
-	kfuncs, err = btrace.DetectTraceable(traceableBPFSpec, kfuncs)
+	bpfsnoop.VerboseLog("Detect %d kernel functions traceable ..", len(kfuncs))
+	kfuncs, err = bpfsnoop.DetectTraceable(traceableBPFSpec, kfuncs)
 	assert.NoVerifierErr(err, "Failed to detect traceable for kfuncs: %v")
 
-	var addr2line *btrace.Addr2Line
+	var addr2line *bpfsnoop.Addr2Line
 
-	vmlinux, err := btrace.FindVmlinux()
+	vmlinux, err := bpfsnoop.FindVmlinux()
 	if err != nil {
-		if errors.Is(err, btrace.ErrNotFound) {
-			btrace.VerboseLog("Dbgsym vmlinux not found")
+		if errors.Is(err, bpfsnoop.ErrNotFound) {
+			bpfsnoop.VerboseLog("Dbgsym vmlinux not found")
 		} else {
 			assert.NoErr(err, "Failed to find vmlinux: %v")
 		}
 	}
 	if err == nil {
-		btrace.VerboseLog("Found vmlinux: %s", vmlinux)
+		bpfsnoop.VerboseLog("Found vmlinux: %s", vmlinux)
 
-		textAddr, err := btrace.ReadTextAddrFromVmlinux(vmlinux)
+		textAddr, err := bpfsnoop.ReadTextAddrFromVmlinux(vmlinux)
 		assert.NoErr(err, "Failed to read .text address from vmlinux: %v")
 
-		btrace.VerboseLog("Creating addr2line from vmlinux ..")
-		kaslr := btrace.NewKaslr(kallsyms.Stext(), textAddr)
-		addr2line, err = btrace.NewAddr2Line(vmlinux, kaslr, kallsyms.SysBPF(), kallsyms.Stext())
+		bpfsnoop.VerboseLog("Creating addr2line from vmlinux ..")
+		kaslr := bpfsnoop.NewKaslr(kallsyms.Stext(), textAddr)
+		addr2line, err = bpfsnoop.NewAddr2Line(vmlinux, kaslr, kallsyms.SysBPF(), kallsyms.Stext())
 		assert.NoErr(err, "Failed to create addr2line: %v")
 	}
 
@@ -111,31 +111,31 @@ func main() {
 	assert.NoErr(err, "Failed to create capstone engine: %v")
 	defer engine.Close()
 
-	btrace.VerboseLog("Disassembling bpf progs ..")
-	bpfProgs, err := btrace.NewBPFProgs(progs, false, false)
+	bpfsnoop.VerboseLog("Disassembling bpf progs ..")
+	bpfProgs, err := bpfsnoop.NewBPFProgs(progs, false, false)
 	assert.NoErr(err, "Failed to get bpf progs: %v")
 	defer bpfProgs.Close()
 
 	tracingTargets := bpfProgs.Tracings()
 	assert.True(len(tracingTargets)+len(kfuncs) != 0, "No tracing target")
 
-	btrace.VerboseLog("Tracing bpf progs or kernel functions ..")
+	bpfsnoop.VerboseLog("Tracing bpf progs or kernel functions ..")
 
-	btrace.TrimSpec(bpfSpec)
+	bpfsnoop.TrimSpec(bpfSpec)
 
-	reusedMaps := btrace.PrepareBPFMaps(bpfSpec)
-	defer btrace.CloseBPFMaps(reusedMaps)
+	reusedMaps := bpfsnoop.PrepareBPFMaps(bpfSpec)
+	defer bpfsnoop.CloseBPFMaps(reusedMaps)
 
 	if len(kfuncs) > 20 {
-		log.Printf("btrace is tracing %d kernel functions, this may take a while", len(kfuncs))
+		log.Printf("bpfsnoop is tracing %d kernel functions, this may take a while", len(kfuncs))
 	}
 
 	tstarted := time.Now()
-	tracings, err := btrace.NewBPFTracing(bpfSpec, reusedMaps, bpfProgs, kfuncs)
+	tracings, err := bpfsnoop.NewBPFTracing(bpfSpec, reusedMaps, bpfProgs, kfuncs)
 	assert.NoVerifierErr(err, "Failed to trace: %v")
-	btrace.DebugLog("Tracing %d tracees cost %s", len(tracings.Progs()), time.Since(tstarted))
+	bpfsnoop.DebugLog("Tracing %d tracees cost %s", len(tracings.Progs()), time.Since(tstarted))
 	var tended time.Time
-	defer func() { btrace.DebugLog("Untracing %d tracees cost %s", len(tracings.Progs()), time.Since(tended)) }()
+	defer func() { bpfsnoop.DebugLog("Untracing %d tracees cost %s", len(tracings.Progs()), time.Since(tended)) }()
 	defer tracings.Close()
 	defer func() { tended = time.Now() }()
 	assert.True(tracings.HaveTracing(), "No tracing target")
@@ -143,10 +143,10 @@ func main() {
 	err = bpfProgs.AddProgs(tracings.Progs(), true)
 	assert.NoErr(err, "Failed to add bpf progs: %v")
 
-	kallsyms, err = btrace.NewKallsyms()
+	kallsyms, err = bpfsnoop.NewKallsyms()
 	assert.NoErr(err, "Failed to reread /proc/kallsyms: %v")
 
-	reader, err := ringbuf.NewReader(reusedMaps["btrace_events"])
+	reader, err := ringbuf.NewReader(reusedMaps["bpfsnoop_events"])
 	assert.NoErr(err, "Failed to create ringbuf reader: %v")
 	defer reader.Close()
 
@@ -163,8 +163,8 @@ func main() {
 	assert.NoErr(err, "Failed to update ready data map: %v")
 	defer readyData.Put(uint32(0), uint32(0))
 
-	log.Print("btrace is running..")
-	defer log.Print("btrace is exiting..")
+	log.Print("bpfsnoop is running..")
+	defer log.Print("bpfsnoop is exiting..")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -178,11 +178,11 @@ func main() {
 	})
 
 	errg.Go(func() error {
-		return btrace.Run(reader, bpfProgs, addr2line, kallsyms, kfuncs, reusedMaps, w)
+		return bpfsnoop.Run(reader, bpfProgs, addr2line, kallsyms, kfuncs, reusedMaps, w)
 	})
 
 	err = errg.Wait()
-	if err == btrace.ErrFinished {
+	if err == bpfsnoop.ErrFinished {
 		return
 	}
 	assert.NoErr(err, "Failed: %v")
