@@ -135,6 +135,8 @@ func (t *bpfTracing) injectArgFilter(prog *ebpf.ProgramSpec, params []btf.FuncPa
 		return nil
 	}
 
+	clearFilterArgSubprog(prog)
+
 	return nil
 }
 
@@ -217,6 +219,8 @@ func (t *bpfTracing) injectPktFilter(prog *ebpf.ProgramSpec, params []btf.FuncPa
 		}
 	}
 
+	pktFilter.clear(prog)
+
 	return nil
 }
 
@@ -248,8 +252,9 @@ func (t *bpfTracing) injectPktOutput(prog *ebpf.ProgramSpec, params []btf.FuncPa
 			DebugLog("Injected --output-pkt to %dth param %s of %s", i, p.Name, fnName)
 			return
 		}
-
 	}
+
+	pktOutput.clear(prog)
 }
 
 func (t *bpfTracing) traceProg(spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, info bpfTracingInfo, bprogs *bpfProgs) error {
