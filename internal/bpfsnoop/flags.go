@@ -23,6 +23,8 @@ var (
 	filterPkt         string
 	outputArg         []string
 
+	outputFlameGraph string
+
 	outputLbr       bool
 	outputFuncStack bool
 	outputPkt       bool
@@ -62,6 +64,7 @@ func ParseFlags() (*Flags, error) {
 	f.StringVarP(&mode, "mode", "m", TracingModeExit, "mode of bpfsnoop, exit or entry")
 	f.BoolVar(&outputLbr, "output-lbr", false, "output LBR perf event")
 	f.BoolVar(&outputFuncStack, "output-stack", false, "output function call stack")
+	f.StringVar(&outputFlameGraph, "output-flamegraph", "", "output flamegraph fold data")
 	f.BoolVar(&outputPkt, "output-pkt", false, "output packet's tuple info if tracee has skb/xdp argument")
 	f.Uint32Var(&filterPid, "filter-pid", 0, "filter pid for tracing")
 	f.StringSliceVar(&filterArg, "filter-arg", nil, "filter function's argument with C expression, e.g. 'prog->type == BPF_PROG_TYPE_TRACING'")
@@ -71,9 +74,11 @@ func ParseFlags() (*Flags, error) {
 	f.BoolVar(&flags.showFuncProto, "show-func-proto", false, "show function prototype of -p,-k")
 
 	f.MarkHidden("debug-log")
+	f.MarkHidden("output-flamegraph")
 
 	err := f.Parse(os.Args)
 
+	outputFuncStack = outputFuncStack || outputFlameGraph != ""
 	noColorOutput = flags.outputFile != "" || !isatty(os.Stdout.Fd())
 	argFilter = prepareFuncArguments(filterArg)
 	argOutput = prepareFuncArgOutput(outputArg)

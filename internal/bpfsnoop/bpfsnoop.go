@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"unsafe"
 
@@ -85,6 +86,10 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 	var pktData PktData
 	var argData ArgData
 
+	fg := NewFlameGraph()
+	defer fg.Save(outputFlameGraph)
+
+	outputFlameGraph := outputFlameGraph != ""
 	printRetval := mode == TracingModeExit
 	colorOutput := !noColorOutput
 	useLbr := outputLbr
@@ -134,7 +139,7 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 
 		event := (*Event)(unsafe.Pointer(&record.RawSample[0]))
 		if outputFuncStack && event.StackID >= 0 {
-			funcStack, err = getFuncStack(event, progs, addr2line, ksyms, stacks, funcStack)
+			funcStack, err = getFuncStack(event, progs, addr2line, ksyms, stacks, outputFlameGraph, funcStack)
 			if err != nil {
 				return err
 			}
@@ -303,11 +308,14 @@ func Run(reader *ringbuf.Reader, progs *bpfProgs, addr2line *Addr2Line, ksyms *K
 			lbrStack.output(&sb)
 		}
 		hasFuncEntries := len(funcStack) > 0
-		if hasFuncEntries {
+		if hasFuncEntries && !outputFlameGraph {
 			fmt.Fprintln(&sb, "Func stack:")
 			for _, entry := range funcStack {
 				fmt.Fprint(&sb, entry)
 			}
+		} else if hasFuncEntries && outputFlameGraph {
+			slices.Reverse(funcStack)
+			fg.AddStack(funcStack, 1)
 		}
 		fmt.Fprintln(w, sb.String())
 
@@ -376,7 +384,7 @@ func getLbrStack(funcIP uintptr, lbrData *LbrData, progs *bpfProgs, addr2line *A
 	return true
 }
 
-func getFuncStack(event *Event, progs *bpfProgs, addr2line *Addr2Line, ksym *Kallsyms, funcStacks *ebpf.Map, stack []string) ([]string, error) {
+func getFuncStack(event *Event, progs *bpfProgs, addr2line *Addr2Line, ksym *Kallsyms, funcStacks *ebpf.Map, symbolOnly bool, stack []string) ([]string, error) {
 	id := uint32(event.StackID)
 
 	var data FuncStack
@@ -399,6 +407,11 @@ func getFuncStack(event *Event, progs *bpfProgs, addr2line *Addr2Line, ksym *Kal
 		}
 
 		li := getLineInfo(uintptr(ip), progs, addr2line, ksym)
+
+		if symbolOnly {
+			stack = append(stack, li.funcName)
+			continue
+		}
 
 		var sb strings.Builder
 		fmt.Fprint(&sb, "  ")
