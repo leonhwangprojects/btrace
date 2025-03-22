@@ -20,6 +20,9 @@ is_traceable(u64 addr)
     if (bpf_probe_read_kernel(&buff, 16, (void *) addr))
         return false;
 
+    if (!has_endbr ? buff[0] == 0xE8 : buff[4] == 0xE8) /* callq */
+        return true;
+
     static const u64 nop5 = 0x0000441F0F;
     return !has_endbr ? ((((u64) buff[4]) << 32 | (u64)(*(u32 *) buff)) == nop5) :
                         ((((u64) buff[8]) << 32 | (u64)(*(u32 *) (buff + 4))) == nop5);
